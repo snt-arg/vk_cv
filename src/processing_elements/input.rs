@@ -1,19 +1,13 @@
 use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
-        PrimaryCommandBuffer,
-    },
-    descriptor_set::PersistentDescriptorSet,
+    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
     format::Format,
-    image::{view::ImageView, ImageAccess, ImageDimensions, StorageImage},
-    pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
-    sync::{self, GpuFuture},
+    image::{ImageDimensions, StorageImage},
 };
 
-use crate::utils::{self, ImageInfo};
+use crate::utils::ImageInfo;
 
 use super::ProcessingElement;
 
@@ -41,8 +35,6 @@ impl Input {
             Some(queue.family()),
         )
         .unwrap();
-
-        let count = input_format.width * input_format.height * 4;
 
         let input_buffer =
             CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, input_data)

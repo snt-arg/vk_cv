@@ -1,16 +1,9 @@
 use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
-        PrimaryCommandBuffer,
-    },
-    descriptor_set::PersistentDescriptorSet,
+    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
-    format::Format,
-    image::{view::ImageView, ImageAccess, ImageDimensions, StorageImage},
-    pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
-    sync::{self, GpuFuture},
+    image::{ImageAccess, StorageImage},
 };
 
 use crate::utils;
@@ -25,18 +18,6 @@ pub struct Output {
 
 impl Output {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_img: Arc<StorageImage>) -> Self {
-        let output_img = StorageImage::new(
-            device.clone(),
-            ImageDimensions::Dim2d {
-                width: input_img.dimensions().width(),
-                height: input_img.dimensions().height(),
-                array_layers: 1,
-            },
-            Format::R8G8B8A8_UNORM,
-            Some(queue.family()),
-        )
-        .unwrap();
-
         let count = input_img.dimensions().width()
             * input_img.dimensions().height()
             * input_img.dimensions().depth()
@@ -45,7 +26,7 @@ impl Output {
             device.clone(),
             BufferUsage::all(),
             false,
-            (0..count).map(|v| 0u8),
+            (0..count).map(|_| 0u8),
         )
         .unwrap();
 
