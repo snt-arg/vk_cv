@@ -6,7 +6,7 @@ use vulkano::{
     image::{ImageAccess, StorageImage},
 };
 
-use crate::utils;
+use crate::utils::{self, ImageInfo};
 
 use super::ProcessingElement;
 
@@ -34,7 +34,7 @@ impl Output {
         let mut builder = AutoCommandBufferBuilder::primary(
             device.clone(),
             queue.family(),
-            CommandBufferUsage::OneTimeSubmit,
+            CommandBufferUsage::MultipleSubmit,
         )
         .unwrap();
 
@@ -53,7 +53,13 @@ impl Output {
 
     pub fn save_output_buffer(&self, filename: &str) {
         let buffer_content = self.output_buffer.read().unwrap();
-        utils::write_image(filename, &buffer_content);
+
+        let info = ImageInfo {
+            width: self.input_img.dimensions().width(),
+            height: self.input_img.dimensions().height(),
+        };
+
+        utils::write_image(filename, &buffer_content, info);
     }
 }
 

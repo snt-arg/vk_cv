@@ -4,7 +4,7 @@ use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
     format::Format,
-    image::{ImageDimensions, StorageImage},
+    image::{ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage},
 };
 
 use crate::utils::ImageInfo;
@@ -24,7 +24,31 @@ impl Input {
         input_data: Vec<u8>,
         input_format: ImageInfo,
     ) -> Self {
-        let output_img = StorageImage::new(
+        // let output_img = StorageImage::new(
+        //     device.clone(),
+        //     ImageDimensions::Dim2d {
+        //         width: input_format.width,
+        //         height: input_format.height,
+        //         array_layers: 1,
+        //     },
+        //     Format::R8G8B8A8_UNORM,
+        //     Some(queue.family()),
+        // )
+        // .unwrap();
+
+        let usage = ImageUsage {
+            transfer_source: true,
+            transfer_destination: true,
+            sampled: false,
+            storage: true,
+            color_attachment: false,
+            depth_stencil_attachment: false,
+            input_attachment: false,
+            transient_attachment: false,
+        };
+        let flags = ImageCreateFlags::none();
+
+        let output_img = StorageImage::with_usage(
             device.clone(),
             ImageDimensions::Dim2d {
                 width: input_format.width,
@@ -32,6 +56,8 @@ impl Input {
                 array_layers: 1,
             },
             Format::R8G8B8A8_UNORM,
+            usage,
+            flags,
             Some(queue.family()),
         )
         .unwrap();
@@ -44,7 +70,7 @@ impl Input {
         let mut builder = AutoCommandBufferBuilder::primary(
             device.clone(),
             queue.family(),
-            CommandBufferUsage::OneTimeSubmit,
+            CommandBufferUsage::MultipleSubmit,
         )
         .unwrap();
 
@@ -63,6 +89,17 @@ impl Input {
 
     pub fn output_image(&self) -> Arc<StorageImage> {
         self.output_img.clone()
+    }
+
+    pub fn copy_input_data(&mut self, data: &[u8]) {
+        if let Ok(mut lock) = self.input_buffer.write() {
+            let len = lock.len();
+            if len < data.len() {
+                lock.copy_from_slice(&data[0..len]);
+            } else {
+                lock.copy_from_slice(data);
+            }
+        }
     }
 }
 

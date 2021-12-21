@@ -9,3 +9,7 @@ edition = "2021"
 vulkano = "0.27"
 vulkano-shaders = "0.27"
 png = "0.17"
+
+realsense-sys = "2.47.0"
+# gbm = "0.7.0"
+# drm-rs = "0.1"

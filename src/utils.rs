@@ -27,12 +27,12 @@ pub fn load_image(image_path: &str) -> (ImageInfo, Vec<u8>) {
     )
 }
 
-pub fn write_image(image_path: &str, data: &[u8]) {
+pub fn write_image(image_path: &str, data: &[u8], img_info: ImageInfo) {
     let p = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), image_path);
     let path = Path::new(&p);
     let file = File::create(path).unwrap();
     let ref mut w = BufWriter::new(file);
-    let mut encoder = png::Encoder::new(w, 512, 512);
+    let mut encoder = png::Encoder::new(w, img_info.width, img_info.height);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header().unwrap();

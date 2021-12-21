@@ -4,7 +4,9 @@ use vulkano::{
     descriptor_set::PersistentDescriptorSet,
     device::{Device, Queue},
     format::Format,
-    image::{view::ImageView, ImageAccess, ImageDimensions, StorageImage},
+    image::{
+        view::ImageView, ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage,
+    },
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 
@@ -37,7 +39,19 @@ impl Convolution {
             .unwrap()
         };
 
-        let output_img = StorageImage::new(
+        let usage = ImageUsage {
+            transfer_source: true,
+            transfer_destination: true,
+            sampled: false,
+            storage: true,
+            color_attachment: false,
+            depth_stencil_attachment: false,
+            input_attachment: false,
+            transient_attachment: false,
+        };
+        let flags = ImageCreateFlags::none();
+
+        let output_img = StorageImage::with_usage(
             device.clone(),
             ImageDimensions::Dim2d {
                 width: input_img.dimensions().width(),
@@ -45,6 +59,8 @@ impl Convolution {
                 array_layers: 1,
             },
             Format::R8G8B8A8_UNORM,
+            usage,
+            flags,
             Some(queue.family()),
         )
         .unwrap();
@@ -65,7 +81,7 @@ impl Convolution {
         let mut builder = AutoCommandBufferBuilder::primary(
             device.clone(),
             queue.family(),
-            CommandBufferUsage::OneTimeSubmit,
+            CommandBufferUsage::MultipleSubmit,
         )
         .unwrap();
 
