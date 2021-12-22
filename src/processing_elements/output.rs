@@ -18,10 +18,11 @@ pub struct Output {
 
 impl Output {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_img: Arc<StorageImage>) -> Self {
+        let depth = input_img.format().size().unwrap() as u32;
         let count = input_img.dimensions().width()
             * input_img.dimensions().height()
             * input_img.dimensions().depth()
-            * 4;
+            * depth;
         let output_buffer = CpuAccessibleBuffer::from_iter(
             device.clone(),
             BufferUsage::all(),
@@ -54,10 +55,12 @@ impl Output {
     pub fn save_output_buffer(&self, filename: &str) {
         let buffer_content = self.output_buffer.read().unwrap();
 
+        let depth = self.input_img.format().size().unwrap() as u32;
+
         let info = ImageInfo {
             width: self.input_img.dimensions().width(),
             height: self.input_img.dimensions().height(),
-            depth: 4,
+            depth,
         };
 
         utils::write_image(filename, &buffer_content, info);

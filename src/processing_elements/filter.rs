@@ -15,30 +15,24 @@ use super::ProcessingElement;
 mod cs {
     vulkano_shaders::shader! {
         ty: "compute",
-        path: "src/shaders/convelution.comp.glsl",
+        path: "src/shaders/filter.comp.glsl",
     }
 }
 
-pub struct Convolution {
+pub struct Filter {
     input_img: Arc<StorageImage>,
     output_img: Arc<StorageImage>,
     command_buffer: Arc<PrimaryAutoCommandBuffer>,
 }
 
-impl Convolution {
+impl Filter {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_img: Arc<StorageImage>) -> Self {
-        let local_size = 16;
-
         let pipeline = {
             let shader = cs::load(device.clone()).unwrap();
             ComputePipeline::new(
                 device.clone(),
                 shader.entry_point("main").unwrap(),
-                &cs::SpecializationConstants {
-                    constant_0: local_size,
-                    constant_1: local_size,
-                    ..Default::default()
-                },
+                &cs::SpecializationConstants {},
                 None,
                 |_| {},
             )
@@ -51,6 +45,7 @@ impl Convolution {
             storage: true,
             ..ImageUsage::none()
         };
+        let flags = ImageCreateFlags::none();
 
         let output_img = StorageImage::with_usage(
             device.clone(),
@@ -61,7 +56,7 @@ impl Convolution {
             },
             Format::R8_UNORM,
             usage,
-            ImageCreateFlags::none(),
+            flags,
             Some(queue.family()),
         )
         .unwrap();
@@ -86,11 +81,11 @@ impl Convolution {
         )
         .unwrap();
 
-        // let push_constants = cs::ty::PushConstants {
-        //     kernel: [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 2.0],
-        //     offset: 1.0,
-        //     denom: 0.5,
-        // };
+        let push_constants = cs::ty::PushConstants {
+            rgb_min: [0.0, 0.0, 0.0],
+            rgb_max: [0.5, 1.0, 0.5],
+            _dummy0: [0, 0, 0, 0],
+        };
 
         builder
             .bind_pipeline_compute(pipeline.clone())
@@ -100,10 +95,10 @@ impl Convolution {
                 0,
                 set.clone(),
             )
-            // .push_constants(pipeline.layout().clone(), 0, push_constants)
+            .push_constants(pipeline.layout().clone(), 0, push_constants)
             .dispatch([
-                input_img.dimensions().width() / local_size,
-                input_img.dimensions().height() / local_size,
+                input_img.dimensions().width() / 16,
+                input_img.dimensions().height() / 16,
                 1,
             ])
             .unwrap();
@@ -122,7 +117,7 @@ impl Convolution {
     }
 }
 
-impl ProcessingElement for Convolution {
+impl ProcessingElement for Filter {
     fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
         self.command_buffer.clone()
     }

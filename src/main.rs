@@ -1,7 +1,10 @@
+use processing_elements::hsvconv::Hsvconv;
 use realsense::Realsense;
 use vulkano::sync::{self, GpuFuture};
 
-use crate::processing_elements::{convolution::Convolution, output::Output};
+use crate::processing_elements::{
+    convolution::Convolution, filter::Filter, grayscale::Grayscale, output::Output,
+};
 use crate::processing_elements::{input::Input, ProcessingElement};
 
 mod processing_elements;
@@ -25,10 +28,14 @@ fn main() {
 
     // create a convolution pipeline
     let mut pe_input = Input::new(device.clone(), queue.clone(), img_info);
-    let pe_conv = Convolution::new(device.clone(), queue.clone(), pe_input.output_image());
+
+    let pe_hsv = Hsvconv::new(device.clone(), queue.clone(), pe_input.output_image());
+    let pe_hsv_filter = Filter::new(device.clone(), queue.clone(), pe_input.output_image());
+    //let pe_gsc = Grayscale::new(device.clone(), queue.clone(), pe_hsv.output_image());
+    let pe_conv = Convolution::new(device.clone(), queue.clone(), pe_hsv_filter.output_image());
     let pe_out = Output::new(device.clone(), queue.clone(), pe_conv.output_image());
 
-    for i in 0..20 {
+    for i in 0..200 {
         // let color_image = realsense.fetch_image();
         //println!("{} x {}", color_image.width(), color_image.height());
         let pipeline_started = std::time::Instant::now();
@@ -38,6 +45,10 @@ fn main() {
         // exec command buffer
         let future = sync::now(device.clone())
             .then_execute(queue.clone(), pe_input.command_buffer())
+            .unwrap()
+            .then_execute(queue.clone(), pe_hsv.command_buffer())
+            .unwrap()
+            .then_execute(queue.clone(), pe_hsv_filter.command_buffer())
             .unwrap()
             .then_execute(queue.clone(), pe_conv.command_buffer())
             .unwrap()

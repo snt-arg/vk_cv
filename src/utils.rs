@@ -41,7 +41,12 @@ pub fn write_image(image_path: &str, data: &[u8], img_info: ImageInfo) {
     let file = File::create(path).unwrap();
     let ref mut w = BufWriter::new(file);
     let mut encoder = png::Encoder::new(w, img_info.width, img_info.height);
-    encoder.set_color(png::ColorType::Rgba);
+    if img_info.depth == 4 {
+        encoder.set_color(png::ColorType::Rgba);
+    } else if img_info.depth == 1 {
+        encoder.set_color(png::ColorType::Grayscale);
+    }
+
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header().unwrap();
     writer.write_image_data(data).unwrap();

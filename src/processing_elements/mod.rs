@@ -1,4 +1,7 @@
 pub mod convolution;
+pub mod filter;
+pub mod grayscale;
+pub mod hsvconv;
 pub mod input;
 pub mod output;
 
