@@ -57,6 +57,7 @@ impl Output {
         let info = ImageInfo {
             width: self.input_img.dimensions().width(),
             height: self.input_img.dimensions().height(),
+            depth: 4,
         };
 
         utils::write_image(filename, &buffer_content, info);

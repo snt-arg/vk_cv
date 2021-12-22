@@ -32,7 +32,11 @@ impl Convolution {
             ComputePipeline::new(
                 device.clone(),
                 shader.entry_point("main").unwrap(),
-                &cs::SpecializationConstants {},
+                &cs::SpecializationConstants {
+                    THREADS_PER_GROUP: 0,
+                    THREADS_PER_GROUP_X: 16,
+                    THREADS_PER_GROUP_Y: 16,
+                },
                 None,
                 |_| {},
             )
@@ -42,12 +46,8 @@ impl Convolution {
         let usage = ImageUsage {
             transfer_source: true,
             transfer_destination: true,
-            sampled: false,
             storage: true,
-            color_attachment: false,
-            depth_stencil_attachment: false,
-            input_attachment: false,
-            transient_attachment: false,
+            ..ImageUsage::none()
         };
         let flags = ImageCreateFlags::none();
 

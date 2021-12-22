@@ -18,33 +18,11 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        input_data: Vec<u8>,
-        input_format: ImageInfo,
-    ) -> Self {
-        // let output_img = StorageImage::new(
-        //     device.clone(),
-        //     ImageDimensions::Dim2d {
-        //         width: input_format.width,
-        //         height: input_format.height,
-        //         array_layers: 1,
-        //     },
-        //     Format::R8G8B8A8_UNORM,
-        //     Some(queue.family()),
-        // )
-        // .unwrap();
-
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_format: ImageInfo) -> Self {
         let usage = ImageUsage {
-            transfer_source: true,
             transfer_destination: true,
-            sampled: false,
             storage: true,
-            color_attachment: false,
-            depth_stencil_attachment: false,
-            input_attachment: false,
-            transient_attachment: false,
+            ..ImageUsage::none()
         };
         let flags = ImageCreateFlags::none();
 
@@ -62,9 +40,14 @@ impl Input {
         )
         .unwrap();
 
-        let input_buffer =
-            CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, input_data)
-                .unwrap();
+        let count = input_format.bytes_count();
+        let input_buffer = CpuAccessibleBuffer::from_iter(
+            device.clone(),
+            BufferUsage::all(),
+            false,
+            (0..count).map(|_| 0u8),
+        )
+        .unwrap();
 
         // build command buffer
         let mut builder = AutoCommandBufferBuilder::primary(

@@ -3,6 +3,13 @@ use std::{fs::File, io::BufWriter, path::Path};
 pub struct ImageInfo {
     pub width: u32,
     pub height: u32,
+    pub depth: u32,
+}
+
+impl ImageInfo {
+    pub fn bytes_count(&self) -> u32 {
+        self.width * self.height * self.depth
+    }
 }
 
 pub fn load_image(image_path: &str) -> (ImageInfo, Vec<u8>) {
@@ -22,6 +29,7 @@ pub fn load_image(image_path: &str) -> (ImageInfo, Vec<u8>) {
         ImageInfo {
             width: oi.width,
             height: oi.height,
+            depth: 4,
         },
         img_data,
     )
