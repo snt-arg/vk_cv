@@ -1,5 +1,6 @@
+pub mod color_filter;
 pub mod convolution;
-pub mod filter;
+pub mod convolution_2p;
 pub mod grayscale;
 pub mod hsvconv;
 pub mod input;

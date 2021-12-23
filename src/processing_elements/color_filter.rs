@@ -15,17 +15,17 @@ use super::ProcessingElement;
 mod cs {
     vulkano_shaders::shader! {
         ty: "compute",
-        path: "src/shaders/filter.comp.glsl",
+        path: "src/shaders/color_filter.comp.glsl",
     }
 }
 
-pub struct Filter {
+pub struct ColorFilter {
     input_img: Arc<StorageImage>,
     output_img: Arc<StorageImage>,
     command_buffer: Arc<PrimaryAutoCommandBuffer>,
 }
 
-impl Filter {
+impl ColorFilter {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_img: Arc<StorageImage>) -> Self {
         let pipeline = {
             let shader = cs::load(device.clone()).unwrap();
@@ -117,7 +117,7 @@ impl Filter {
     }
 }
 
-impl ProcessingElement for Filter {
+impl ProcessingElement for ColorFilter {
     fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
         self.command_buffer.clone()
     }
