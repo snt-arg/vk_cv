@@ -3,12 +3,11 @@ use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
     descriptor_set::PersistentDescriptorSet,
     device::{Device, Queue},
-    format::Format,
-    image::{
-        view::ImageView, ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage,
-    },
+    image::{view::ImageView, ImageAccess, StorageImage},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
+
+use crate::utils::create_storage_image;
 
 use super::ProcessingElement;
 
@@ -26,7 +25,7 @@ pub struct Hsvconv {
 }
 
 impl Hsvconv {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_img: Arc<StorageImage>) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input: &dyn ProcessingElement) -> Self {
         let pipeline = {
             let shader = cs::load(device.clone()).unwrap();
             ComputePipeline::new(
@@ -39,27 +38,11 @@ impl Hsvconv {
             .unwrap()
         };
 
-        let usage = ImageUsage {
-            transfer_source: true,
-            transfer_destination: true,
-            storage: true,
-            ..ImageUsage::none()
-        };
-        let flags = ImageCreateFlags::none();
+        // input image
+        let input_img = input.output_image().unwrap();
 
-        let output_img = StorageImage::with_usage(
-            device.clone(),
-            ImageDimensions::Dim2d {
-                width: input_img.dimensions().width(),
-                height: input_img.dimensions().height(),
-                array_layers: 1,
-            },
-            Format::R8G8B8A8_UNORM,
-            usage,
-            flags,
-            Some(queue.family()),
-        )
-        .unwrap();
+        // output image
+        let output_img = create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
 
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
@@ -104,14 +87,18 @@ impl Hsvconv {
             command_buffer,
         }
     }
-
-    pub fn output_image(&self) -> Arc<StorageImage> {
-        self.output_img.clone()
-    }
 }
 
 impl ProcessingElement for Hsvconv {
     fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
         self.command_buffer.clone()
+    }
+
+    fn input_image(&self) -> Option<Arc<StorageImage>> {
+        Some(self.input_img.clone())
+    }
+
+    fn output_image(&self) -> Option<Arc<StorageImage>> {
+        Some(self.output_img.clone())
     }
 }

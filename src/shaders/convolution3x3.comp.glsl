@@ -20,10 +20,6 @@ layout(constant_id = 12) const float denom = 2.0;
 
 // shared float sharedData[THREADS_PER_GROUP_X][THREADS_PER_GROUP_Y];
 
-// layout(constant_id = 0) const float[9] kernel = float[](-1.0,  0.0, 0.0,
-//     0.0, -1.0, 0.0,
-//     0.0,  0.0, 2.0);
-
 // 128 bytes max.
 // layout(push_constant) uniform PushConstants {
 //   float[9] kernel;

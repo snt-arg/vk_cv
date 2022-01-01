@@ -3,13 +3,12 @@ use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
-    format::Format,
-    image::{ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage},
+    image::{ImageCreateFlags, ImageUsage, StorageImage},
 };
 
-use crate::utils::ImageInfo;
+use crate::utils::{create_storage_image, ImageInfo};
 
-use super::ProcessingElement;
+use super::{PipeInput, ProcessingElement};
 
 pub struct Input {
     output_img: Arc<StorageImage>,
@@ -18,27 +17,9 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_format: ImageInfo) -> Self {
-        let usage = ImageUsage {
-            transfer_destination: true,
-            storage: true,
-            ..ImageUsage::none()
-        };
-        let flags = ImageCreateFlags::none();
-
-        let output_img = StorageImage::with_usage(
-            device.clone(),
-            ImageDimensions::Dim2d {
-                width: input_format.width,
-                height: input_format.height,
-                array_layers: 1,
-            },
-            Format::R8G8B8A8_UNORM,
-            usage,
-            flags,
-            Some(queue.family()),
-        )
-        .unwrap();
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_format: &ImageInfo) -> Self {
+        // output image
+        let output_img = create_storage_image(device.clone(), queue.clone(), input_format);
 
         let count = input_format.bytes_count();
         let input_buffer = CpuAccessibleBuffer::from_iter(
@@ -70,10 +51,6 @@ impl Input {
         }
     }
 
-    pub fn output_image(&self) -> Arc<StorageImage> {
-        self.output_img.clone()
-    }
-
     pub fn copy_input_data(&mut self, data: &[u8]) {
         if let Ok(mut lock) = self.input_buffer.write() {
             let len = lock.len();
@@ -90,4 +67,14 @@ impl ProcessingElement for Input {
     fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
         self.command_buffer.clone()
     }
+
+    fn input_image(&self) -> Option<Arc<StorageImage>> {
+        None
+    }
+
+    fn output_image(&self) -> Option<Arc<StorageImage>> {
+        Some(self.output_img.clone())
+    }
 }
+
+impl PipeInput for Input {}

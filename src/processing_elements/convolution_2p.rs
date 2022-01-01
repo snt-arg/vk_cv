@@ -3,12 +3,11 @@ use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
     descriptor_set::PersistentDescriptorSet,
     device::{Device, Queue},
-    format::Format,
-    image::{
-        view::ImageView, ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage,
-    },
+    image::{view::ImageView, ImageAccess, StorageImage},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
+
+use crate::utils::create_storage_image;
 
 use super::ProcessingElement;
 
@@ -26,8 +25,8 @@ pub struct Convolution2Pass {
 }
 
 impl Convolution2Pass {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_img: Arc<StorageImage>) -> Self {
-        let local_size = 16;
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input: &dyn ProcessingElement) -> Self {
+        let local_size = 32;
 
         // shader for the first pass
         let pipeline_1p = {
@@ -38,6 +37,10 @@ impl Convolution2Pass {
                 &cs::SpecializationConstants {
                     constant_0: local_size,
                     constant_1: local_size,
+                    offset: 0.5,
+                    m1: 1.0,
+                    m2: 2.0,
+                    m3: 1.0,
                     ..Default::default()
                 },
                 None,
@@ -45,6 +48,9 @@ impl Convolution2Pass {
             )
             .unwrap()
         };
+
+        // input image
+        let input_img = input.output_image().unwrap();
 
         // shader for the second pass
         let pipeline_2p = {
@@ -56,6 +62,10 @@ impl Convolution2Pass {
                     constant_0: local_size,
                     constant_1: local_size,
                     v_pass: 1,
+                    offset: 0.5,
+                    m4: 1.0,
+                    m5: 0.0,
+                    m6: -1.0,
                     ..Default::default()
                 },
                 None,
@@ -64,40 +74,11 @@ impl Convolution2Pass {
             .unwrap()
         };
 
-        let usage = ImageUsage {
-            transfer_source: true,
-            transfer_destination: true,
-            storage: true,
-            ..ImageUsage::none()
-        };
-
-        let intermediate_img = StorageImage::with_usage(
-            device.clone(),
-            ImageDimensions::Dim2d {
-                width: input_img.dimensions().width(),
-                height: input_img.dimensions().height(),
-                array_layers: 1,
-            },
-            Format::R8_UNORM,
-            usage,
-            ImageCreateFlags::none(),
-            Some(queue.family()),
-        )
-        .unwrap();
-
-        let output_img = StorageImage::with_usage(
-            device.clone(),
-            ImageDimensions::Dim2d {
-                width: input_img.dimensions().width(),
-                height: input_img.dimensions().height(),
-                array_layers: 1,
-            },
-            Format::R8_UNORM,
-            usage,
-            ImageCreateFlags::none(),
-            Some(queue.family()),
-        )
-        .unwrap();
+        // output image for first pass
+        let intermediate_img =
+            create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
+        // output image for second pass
+        let output_img = create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
 
         // setup layout
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
@@ -135,12 +116,6 @@ impl Convolution2Pass {
             CommandBufferUsage::MultipleSubmit,
         )
         .unwrap();
-
-        // let push_constants = cs::ty::PushConstants {
-        //     kernel: [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 2.0],
-        //     offset: 1.0,
-        //     denom: 0.5,
-        // };
 
         builder
             .bind_pipeline_compute(pipeline_1p.clone())
@@ -180,14 +155,18 @@ impl Convolution2Pass {
             command_buffer,
         }
     }
-
-    pub fn output_image(&self) -> Arc<StorageImage> {
-        self.output_img.clone()
-    }
 }
 
 impl ProcessingElement for Convolution2Pass {
     fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
         self.command_buffer.clone()
+    }
+
+    fn input_image(&self) -> Option<Arc<StorageImage>> {
+        Some(self.input_img.clone())
+    }
+
+    fn output_image(&self) -> Option<Arc<StorageImage>> {
+        Some(self.output_img.clone())
     }
 }

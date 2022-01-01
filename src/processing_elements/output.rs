@@ -8,7 +8,7 @@ use vulkano::{
 
 use crate::utils::{self, ImageInfo};
 
-use super::ProcessingElement;
+use super::{PipeOutput, ProcessingElement};
 
 pub struct Output {
     input_img: Arc<StorageImage>,
@@ -17,7 +17,11 @@ pub struct Output {
 }
 
 impl Output {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input_img: Arc<StorageImage>) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input: &dyn ProcessingElement) -> Self {
+        // input image
+        let input_img = input.output_image().unwrap();
+
+        // output buffer (cpu accessible)
         let depth = input_img.format().size().unwrap() as u32;
         let count = input_img.dimensions().width()
             * input_img.dimensions().height()
@@ -55,12 +59,10 @@ impl Output {
     pub fn save_output_buffer(&self, filename: &str) {
         let buffer_content = self.output_buffer.read().unwrap();
 
-        let depth = self.input_img.format().size().unwrap() as u32;
-
         let info = ImageInfo {
             width: self.input_img.dimensions().width(),
             height: self.input_img.dimensions().height(),
-            depth,
+            format: self.input_img.format(),
         };
 
         utils::write_image(filename, &buffer_content, info);
@@ -71,4 +73,14 @@ impl ProcessingElement for Output {
     fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
         self.command_buffer.clone()
     }
+
+    fn input_image(&self) -> Option<Arc<StorageImage>> {
+        Some(self.input_img.clone())
+    }
+
+    fn output_image(&self) -> Option<Arc<StorageImage>> {
+        None
+    }
 }
+
+impl PipeOutput for Output {}
