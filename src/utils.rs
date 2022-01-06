@@ -76,6 +76,19 @@ pub fn write_image(image_path: &str, data: &[u8], img_info: ImageInfo) {
     match img_info.format {
         Format::R8G8B8A8_UNORM => encoder.set_color(png::ColorType::Rgba),
         Format::R8_UNORM => encoder.set_color(png::ColorType::Grayscale),
+        Format::R32G32B32A32_SFLOAT => {
+            dbg!(data);
+            let x = f32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+            dbg!(x);
+            let y = f32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+            dbg!(y);
+            let z = f32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+            dbg!(z);
+
+            dbg!(x / z, y / z);
+
+            return;
+        }
         _ => unimplemented!(),
     }
 

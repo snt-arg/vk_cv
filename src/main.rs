@@ -5,12 +5,13 @@ mod vk_init;
 
 use processing_elements::convolution_2p::Convolution2Pass;
 use processing_elements::hsvconv::Hsvconv;
+use processing_elements::morphology::Operation;
 use realsense::Realsense;
 use vulkano::sync::{self, GpuFuture};
 
 use crate::processing_elements::{
     color_filter::ColorFilter, convolution::Convolution, grayscale::Grayscale,
-    morphology::Morphology, output::Output,
+    morphology::Morphology, output::Output, tracker::Tracker,
 };
 use crate::processing_elements::{input::Input, ProcessingElement};
 use anyhow::Result;
@@ -35,8 +36,10 @@ fn main() -> Result<()> {
 
     // let pe_conv = Convolution::new(device.clone(), queue.clone(), &pe_hsv_filter);
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
-    let pe_morph = Morphology::new(device.clone(), queue.clone(), &pe_gsc);
-    let pe_out = Output::new(device.clone(), queue.clone(), &pe_morph);
+    let pe_erode = Morphology::new(device.clone(), queue.clone(), &pe_gsc, Operation::Erode);
+    let pe_dilate = Morphology::new(device.clone(), queue.clone(), &pe_erode, Operation::Dilate);
+    let pe_tracker = Tracker::new(device.clone(), queue.clone(), &pe_dilate);
+    let pe_out = Output::new(device.clone(), queue.clone(), &pe_tracker);
 
     for i in 0..200 {
         // let color_image = realsense.fetch_image();
@@ -50,19 +53,9 @@ fn main() -> Result<()> {
             device,
             queue,
             input: pe_input,
-            elements: [pe_gsc, pe_morph], //
+            elements: [pe_gsc, pe_erode, pe_dilate, pe_tracker], // order!
             output: pe_out
         );
-
-        // let future = sync::now(device.clone())
-        //     .then_execute_same_queue(pe_input.command_buffer())?
-        //     .then_execute_same_queue(pe_gsc.command_buffer())?
-        //     // .then_execute_same_queue(pe_hsv.command_buffer())?
-        //     // .then_execute_same_queue(pe_hsv_filter.command_buffer())?
-        //     // .then_execute_same_queue(pe_conv_2p.command_buffer())?
-        //     .then_execute_same_queue(pe_morph.command_buffer())?
-        //     .then_execute_same_queue(pe_out.command_buffer())?
-        //     .then_signal_fence_and_flush()?;
 
         // check data
         future.wait(None).unwrap();

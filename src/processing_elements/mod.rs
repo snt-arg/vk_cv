@@ -6,6 +6,7 @@ pub mod hsvconv;
 pub mod input;
 pub mod morphology;
 pub mod output;
+pub mod tracker;
 
 use std::sync::Arc;
 use vulkano::{command_buffer::PrimaryAutoCommandBuffer, image::StorageImage};

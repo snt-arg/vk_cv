@@ -18,6 +18,11 @@ mod cs {
     }
 }
 
+pub enum Operation {
+    Erode,
+    Dilate,
+}
+
 pub struct Morphology {
     input_img: Arc<StorageImage>,
     output_img: Arc<StorageImage>,
@@ -25,7 +30,12 @@ pub struct Morphology {
 }
 
 impl Morphology {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input: &dyn ProcessingElement) -> Self {
+    pub fn new(
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        input: &dyn ProcessingElement,
+        op: Operation,
+    ) -> Self {
         let local_size = 16;
 
         let pipeline = {
@@ -36,7 +46,10 @@ impl Morphology {
                 &cs::SpecializationConstants {
                     constant_0: local_size,
                     constant_1: local_size,
-                    erode_dilate: 1,
+                    erode_dilate: match op {
+                        Operation::Erode => 0,
+                        Operation::Dilate => 1,
+                    },
                     ..Default::default()
                 },
                 None,
