@@ -19,13 +19,35 @@ mod cs {
 }
 
 pub struct Hsvconv {
-    input_img: Arc<StorageImage>,
-    output_img: Arc<StorageImage>,
-    command_buffer: Arc<PrimaryAutoCommandBuffer>,
+    input_img: Option<Arc<StorageImage>>,
+    output_img: Option<Arc<StorageImage>>,
 }
 
 impl Hsvconv {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input: &dyn ProcessingElement) -> Self {
+    pub fn new() -> Self {
+        Self {
+            input_img: None,
+            output_img: None,
+        }
+    }
+}
+
+impl ProcessingElement for Hsvconv {
+    fn input_image(&self) -> Option<Arc<StorageImage>> {
+        self.input_img.clone()
+    }
+
+    fn output_image(&self) -> Option<Arc<StorageImage>> {
+        self.output_img.clone()
+    }
+
+    fn build(
+        &mut self,
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        input: &dyn ProcessingElement,
+    ) {
         let pipeline = {
             let shader = cs::load(device.clone()).unwrap();
             ComputePipeline::new(
@@ -57,13 +79,6 @@ impl Hsvconv {
         let set = set_builder.build().unwrap();
 
         // build command buffer
-        let mut builder = AutoCommandBufferBuilder::primary(
-            device.clone(),
-            queue.family(),
-            CommandBufferUsage::MultipleSubmit,
-        )
-        .unwrap();
-
         builder
             .bind_pipeline_compute(pipeline.clone())
             .bind_descriptor_sets(
@@ -79,26 +94,7 @@ impl Hsvconv {
             ])
             .unwrap();
 
-        let command_buffer = Arc::new(builder.build().unwrap());
-
-        Self {
-            input_img,
-            output_img,
-            command_buffer,
-        }
-    }
-}
-
-impl ProcessingElement for Hsvconv {
-    fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
-        self.command_buffer.clone()
-    }
-
-    fn input_image(&self) -> Option<Arc<StorageImage>> {
-        Some(self.input_img.clone())
-    }
-
-    fn output_image(&self) -> Option<Arc<StorageImage>> {
-        Some(self.output_img.clone())
+        self.input_img = Some(input_img);
+        self.output_img = Some(output_img);
     }
 }

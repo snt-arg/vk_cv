@@ -30,101 +30,15 @@ mod cs2 {
 }
 
 pub struct Tracker {
-    input_img: Arc<StorageImage>,
-    output_img: Arc<StorageImage>,
-    command_buffer: Arc<PrimaryAutoCommandBuffer>,
+    input_img: Option<Arc<StorageImage>>,
+    output_img: Option<Arc<StorageImage>>,
 }
 
 impl Tracker {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, input: &dyn ProcessingElement) -> Self {
-        let local_size = (1, 8);
-
-        // input image
-        let input_img = input.output_image().unwrap();
-
-        // pipeline
-        let pipeline = {
-            let shader = cs1::load(device.clone()).unwrap();
-            ComputePipeline::new(
-                device.clone(),
-                shader.entry_point("main").unwrap(),
-                &cs1::SpecializationConstants {
-                    inv_width: 1.0 / input_img.dimensions().width() as f32,
-                    inv_height: 1.0 / input_img.dimensions().height() as f32,
-                    ..Default::default()
-                },
-                None,
-                |_| {},
-            )
-            .unwrap()
-        };
-
-        // output image
-        let output_img = create_storage_image(
-            device.clone(),
-            queue.clone(),
-            &ImageInfo::from_image(&input_img, Format::R32G32B32A32_SFLOAT),
-        );
-        // https://developer.nvidia.com/gpugems/gpugems3/part-iv-image-effects/chapter-26-object-detection-color-using-gpu-real-time-video
-        // let samples = Sampler::new(
-        //     device.clone(),
-        //     Filter::Linear,
-        //     Filter::Linear,
-        //     MipmapMode::Nearest,
-        //     SamplerAddressMode::Repeat,
-        //     SamplerAddressMode::Repeat,
-        //     SamplerAddressMode::Repeat,
-        //     0.0,
-        //     1.0,
-        //     0.0,
-        //     0.0,
-        // );
-
-        // setup layout
-        let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let mut set_builder = PersistentDescriptorSet::start(layout.clone());
-
-        let input_img_view = ImageView::new(input_img.clone()).unwrap();
-        let output_img_view = ImageView::new(output_img.clone()).unwrap();
-
-        set_builder.add_image(input_img_view).unwrap();
-        set_builder.add_image(output_img_view).unwrap();
-        // set_builder.add_sampled_image(input_img_view, sampler)
-
-        let set = set_builder.build().unwrap();
-
-        // build command buffer
-        let mut builder = AutoCommandBufferBuilder::primary(
-            device.clone(),
-            queue.family(),
-            CommandBufferUsage::MultipleSubmit,
-        )
-        .unwrap();
-
-        builder
-            .bind_pipeline_compute(pipeline.clone())
-            .bind_descriptor_sets(
-                PipelineBindPoint::Compute,
-                pipeline.layout().clone(),
-                0,
-                set.clone(),
-            )
-            // .push_constants(pipeline.layout().clone(), 0, push_constants)
-            .dispatch([
-                input_img.dimensions().width() / 16,
-                input_img.dimensions().height() / 16,
-                1,
-            ])
-            .unwrap();
-
-        let output_img = Self::reduce(device, queue, &mut builder, output_img.clone());
-
-        let command_buffer = Arc::new(builder.build().unwrap());
-
+    pub fn new() -> Self {
         Self {
-            input_img,
-            output_img,
-            command_buffer,
+            input_img: None,
+            output_img: None,
         }
     }
 
@@ -202,15 +116,97 @@ impl Tracker {
 }
 
 impl ProcessingElement for Tracker {
-    fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
-        self.command_buffer.clone()
-    }
-
     fn input_image(&self) -> Option<Arc<StorageImage>> {
-        Some(self.input_img.clone())
+        self.input_img.clone()
     }
 
     fn output_image(&self) -> Option<Arc<StorageImage>> {
-        Some(self.output_img.clone())
+        self.output_img.clone()
+    }
+
+    fn build(
+        &mut self,
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        input: &dyn ProcessingElement,
+    ) {
+        let local_size = (1, 8);
+
+        // input image
+        let input_img = input.output_image().unwrap();
+
+        // pipeline
+        let pipeline = {
+            let shader = cs1::load(device.clone()).unwrap();
+            ComputePipeline::new(
+                device.clone(),
+                shader.entry_point("main").unwrap(),
+                &cs1::SpecializationConstants {
+                    inv_width: 1.0 / input_img.dimensions().width() as f32,
+                    inv_height: 1.0 / input_img.dimensions().height() as f32,
+                    ..Default::default()
+                },
+                None,
+                |_| {},
+            )
+            .unwrap()
+        };
+
+        // output image
+        let output_img = create_storage_image(
+            device.clone(),
+            queue.clone(),
+            &ImageInfo::from_image(&input_img, Format::R32G32B32A32_SFLOAT),
+        );
+        // https://developer.nvidia.com/gpugems/gpugems3/part-iv-image-effects/chapter-26-object-detection-color-using-gpu-real-time-video
+        // let samples = Sampler::new(
+        //     device.clone(),
+        //     Filter::Linear,
+        //     Filter::Linear,
+        //     MipmapMode::Nearest,
+        //     SamplerAddressMode::Repeat,
+        //     SamplerAddressMode::Repeat,
+        //     SamplerAddressMode::Repeat,
+        //     0.0,
+        //     1.0,
+        //     0.0,
+        //     0.0,
+        // );
+
+        // setup layout
+        let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
+        let mut set_builder = PersistentDescriptorSet::start(layout.clone());
+
+        let input_img_view = ImageView::new(input_img.clone()).unwrap();
+        let output_img_view = ImageView::new(output_img.clone()).unwrap();
+
+        set_builder.add_image(input_img_view).unwrap();
+        set_builder.add_image(output_img_view).unwrap();
+        // set_builder.add_sampled_image(input_img_view, sampler)
+
+        let set = set_builder.build().unwrap();
+
+        // build command buffer
+        builder
+            .bind_pipeline_compute(pipeline.clone())
+            .bind_descriptor_sets(
+                PipelineBindPoint::Compute,
+                pipeline.layout().clone(),
+                0,
+                set.clone(),
+            )
+            // .push_constants(pipeline.layout().clone(), 0, push_constants)
+            .dispatch([
+                input_img.dimensions().width() / 16,
+                input_img.dimensions().height() / 16,
+                1,
+            ])
+            .unwrap();
+
+        let output_img = Self::reduce(device, queue, builder, output_img.clone());
+
+        self.input_img = Some(input_img);
+        self.output_img = Some(output_img);
     }
 }

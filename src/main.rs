@@ -14,6 +14,7 @@ use crate::processing_elements::{
     morphology::Morphology, output::Output, tracker::Tracker,
 };
 use crate::processing_elements::{input::Input, ProcessingElement};
+use crate::utils::cv_pipeline;
 use anyhow::Result;
 
 fn main() -> Result<()> {
@@ -28,36 +29,43 @@ fn main() -> Result<()> {
     let queue = queues.next().unwrap();
 
     // create a convolution pipeline
-    let mut pe_input = Input::new(device.clone(), queue.clone(), &img_info);
-    let pe_gsc = Grayscale::new(device.clone(), queue.clone(), &pe_input);
+    let mut pe_input = Input::new(img_info);
+    let mut pe_gsc = Grayscale::new();
 
-    let pe_hsv = Hsvconv::new(device.clone(), queue.clone(), &pe_input);
-    let pe_hsv_filter = ColorFilter::new(device.clone(), queue.clone(), &pe_input);
+    let mut pe_hsv = Hsvconv::new();
+    let mut pe_hsv_filter = ColorFilter::new();
 
     // let pe_conv = Convolution::new(device.clone(), queue.clone(), &pe_hsv_filter);
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
-    let pe_erode = Morphology::new(device.clone(), queue.clone(), &pe_gsc, Operation::Erode);
-    let pe_dilate = Morphology::new(device.clone(), queue.clone(), &pe_erode, Operation::Dilate);
-    let pe_tracker = Tracker::new(device.clone(), queue.clone(), &pe_dilate);
-    let pe_out = Output::new(device.clone(), queue.clone(), &pe_tracker);
+    let mut pe_erode = Morphology::new(Operation::Erode);
+    let mut pe_dilate = Morphology::new(Operation::Dilate);
+    let mut pe_tracker = Tracker::new();
+    let mut pe_out = Output::new();
+
+    let pipeline_cb = cv_pipeline(
+        device.clone(),
+        queue.clone(),
+        &mut pe_input,
+        &mut [&mut pe_gsc, &mut pe_erode, &mut pe_dilate, &mut pe_tracker],
+        &mut pe_out,
+    );
 
     for i in 0..200 {
         // let color_image = realsense.fetch_image();
         //println!("{} x {}", color_image.width(), color_image.height());
         let pipeline_started = std::time::Instant::now();
-        // pe_input.copy_input_data(color_image.data_slice());
+
+        // upload image to GPU
         pe_input.copy_input_data(&img_data);
 
-        // exec command buffer
-        let future = cv_pipeline!(
-            device,
-            queue,
-            input: pe_input,
-            elements: [pe_gsc, pe_erode, pe_dilate, pe_tracker], // order!
-            output: pe_out
-        );
+        // process on GPU
+        let future = sync::now(device.clone())
+            .then_execute(queue.clone(), pipeline_cb.clone())
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap();
 
-        // check data
+        // wait till finished
         future.wait(None).unwrap();
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
         println!("Pipeline took {} us", pipeline_dt.as_micros());

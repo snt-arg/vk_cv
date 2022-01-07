@@ -3,7 +3,8 @@ use std::{fs::File, io::BufWriter, path::Path};
 
 use vulkano::command_buffer::CommandBufferExecFuture;
 use vulkano::command_buffer::PrimaryAutoCommandBuffer;
-use vulkano::device::{Device, Queue};
+use vulkano::command_buffer::{AutoCommandBufferBuilder, PrimaryCommandBuffer};
+use vulkano::device::{Device, Queue, QueuesIter};
 use vulkano::format::Format;
 use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
 use vulkano::sync::NowFuture;
@@ -11,7 +12,9 @@ use vulkano::sync::{self, FenceSignalFuture, GpuFuture};
 
 use anyhow::Result;
 
-use crate::processing_elements::{PipeInput, PipeOutput, ProcessingElement};
+use crate::processing_elements::{
+    PipeInput, PipeInputElement, PipeOutput, PipeOutputElement, ProcessingElement,
+};
 
 pub struct ImageInfo {
     pub width: u32,
@@ -125,21 +128,36 @@ pub fn create_storage_image(
     .unwrap()
 }
 
-#[macro_export]
-macro_rules! cv_pipeline {
-    ($device:expr,$queue:expr,input: $input:expr,elements: [$($pe:expr),*],output: $output:expr) => {
-        {
-            // type check
-            let _:&dyn processing_elements::PipeInput = &$input;
-            let _:&dyn processing_elements::PipeOutput = &$output;
+pub fn cv_pipeline<I, O>(
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    input: &mut I,
+    elements: &mut [&mut dyn ProcessingElement],
+    output: &mut O,
+) -> Arc<PrimaryAutoCommandBuffer>
+where
+    I: PipeInput + ProcessingElement,
+    O: PipeOutput + ProcessingElement,
+{
+    let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
+        device.clone(),
+        queue.family(),
+        vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
+    )
+    .unwrap();
 
-            // build future
-            sync::now($device.clone()).then_execute($queue.clone(), $input.command_buffer()).unwrap()
-            $(
-                .then_execute_same_queue($pe.command_buffer()).unwrap()
-            )*
-            .then_execute_same_queue($output.command_buffer()).unwrap()
-            .then_signal_fence_and_flush().unwrap()
-        }
-    };
+    let dummy = crate::processing_elements::DummyPE {};
+    input.build(device.clone(), queue.clone(), &mut builder, &dummy);
+
+    let mut last_pe: &dyn ProcessingElement = input;
+
+    for pe in elements {
+        pe.build(device.clone(), queue.clone(), &mut builder, last_pe);
+        last_pe = *pe;
+    }
+
+    output.build(device.clone(), queue.clone(), &mut builder, last_pe);
+
+    let command_buffer = Arc::new(builder.build().unwrap());
+    command_buffer
 }

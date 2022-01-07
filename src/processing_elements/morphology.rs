@@ -24,18 +24,37 @@ pub enum Operation {
 }
 
 pub struct Morphology {
-    input_img: Arc<StorageImage>,
-    output_img: Arc<StorageImage>,
-    command_buffer: Arc<PrimaryAutoCommandBuffer>,
+    input_img: Option<Arc<StorageImage>>,
+    output_img: Option<Arc<StorageImage>>,
+    op: Operation,
 }
 
 impl Morphology {
-    pub fn new(
+    pub fn new(op: Operation) -> Self {
+        Self {
+            input_img: None,
+            output_img: None,
+            op,
+        }
+    }
+}
+
+impl ProcessingElement for Morphology {
+    fn input_image(&self) -> Option<Arc<StorageImage>> {
+        self.input_img.clone()
+    }
+
+    fn output_image(&self) -> Option<Arc<StorageImage>> {
+        self.output_img.clone()
+    }
+
+    fn build(
+        &mut self,
         device: Arc<Device>,
         queue: Arc<Queue>,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         input: &dyn ProcessingElement,
-        op: Operation,
-    ) -> Self {
+    ) {
         let local_size = 16;
 
         let pipeline = {
@@ -46,7 +65,7 @@ impl Morphology {
                 &cs::SpecializationConstants {
                     constant_0: local_size,
                     constant_1: local_size,
-                    erode_dilate: match op {
+                    erode_dilate: match self.op {
                         Operation::Erode => 0,
                         Operation::Dilate => 1,
                     },
@@ -77,13 +96,6 @@ impl Morphology {
         let set = set_builder.build().unwrap();
 
         // build command buffer
-        let mut builder = AutoCommandBufferBuilder::primary(
-            device.clone(),
-            queue.family(),
-            CommandBufferUsage::MultipleSubmit,
-        )
-        .unwrap();
-
         // let push_constants = cs::ty::PushConstants {
         //     kernel: [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 2.0],
         //     offset: 1.0,
@@ -106,26 +118,7 @@ impl Morphology {
             ])
             .unwrap();
 
-        let command_buffer = Arc::new(builder.build().unwrap());
-
-        Self {
-            input_img,
-            output_img,
-            command_buffer,
-        }
-    }
-}
-
-impl ProcessingElement for Morphology {
-    fn command_buffer(&self) -> Arc<PrimaryAutoCommandBuffer> {
-        self.command_buffer.clone()
-    }
-
-    fn input_image(&self) -> Option<Arc<StorageImage>> {
-        Some(self.input_img.clone())
-    }
-
-    fn output_image(&self) -> Option<Arc<StorageImage>> {
-        Some(self.output_img.clone())
+        self.input_img = Some(input_img);
+        self.output_img = Some(output_img);
     }
 }
