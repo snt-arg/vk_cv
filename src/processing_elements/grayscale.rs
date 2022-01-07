@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use vulkano::{
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
+    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::PersistentDescriptorSet,
     device::{Device, Queue},
     format::Format,

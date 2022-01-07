@@ -1,20 +1,12 @@
 use std::sync::Arc;
 use std::{fs::File, io::BufWriter, path::Path};
 
-use vulkano::command_buffer::CommandBufferExecFuture;
 use vulkano::command_buffer::PrimaryAutoCommandBuffer;
-use vulkano::command_buffer::{AutoCommandBufferBuilder, PrimaryCommandBuffer};
-use vulkano::device::{Device, Queue, QueuesIter};
+use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
 use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
-use vulkano::sync::NowFuture;
-use vulkano::sync::{self, FenceSignalFuture, GpuFuture};
 
-use anyhow::Result;
-
-use crate::processing_elements::{
-    PipeInput, PipeInputElement, PipeOutput, PipeOutputElement, ProcessingElement,
-};
+use crate::processing_elements::{PipeInput, PipeOutput, ProcessingElement};
 
 pub struct ImageInfo {
     pub width: u32,

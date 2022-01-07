@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use vulkano::{
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
+    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::PersistentDescriptorSet,
     device::{Device, Queue},
     format::Format,
@@ -22,13 +22,17 @@ mod cs {
 pub struct ColorFilter {
     input_img: Option<Arc<StorageImage>>,
     output_img: Option<Arc<StorageImage>>,
+    rgb_min: [f32; 3],
+    rgb_max: [f32; 3],
 }
 
 impl ColorFilter {
-    pub fn new() -> Self {
+    pub fn new(rgb_min: [f32; 3], rgb_max: [f32; 3]) -> Self {
         Self {
             input_img: None,
             output_img: None,
+            rgb_min,
+            rgb_max,
         }
     }
 }
@@ -85,8 +89,8 @@ impl ProcessingElement for ColorFilter {
 
         // build command buffer
         let push_constants = cs::ty::PushConstants {
-            rgb_min: [0.0, 0.0, 0.0],
-            rgb_max: [0.5, 1.0, 0.5],
+            rgb_min: self.rgb_min,
+            rgb_max: self.rgb_max,
             _dummy0: [0, 0, 0, 0],
         };
 

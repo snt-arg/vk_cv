@@ -1,28 +1,37 @@
-mod processing_elements;
-mod realsense;
-mod utils;
-mod vk_init;
-
-use processing_elements::convolution_2p::Convolution2Pass;
-use processing_elements::hsvconv::Hsvconv;
-use processing_elements::morphology::Operation;
-use realsense::Realsense;
-use vulkano::sync::{self, GpuFuture};
-
-use crate::processing_elements::{
-    color_filter::ColorFilter, convolution::Convolution, grayscale::Grayscale,
-    morphology::Morphology, output::Output, tracker::Tracker,
+use vkcv::{
+    processing_elements::{
+        color_filter::ColorFilter,
+        convolution::Convolution,
+        convolution_2p::Convolution2Pass,
+        grayscale::Grayscale,
+        hsvconv::Hsvconv,
+        input::Input,
+        morphology::{Morphology, Operation},
+        output::Output,
+        tracker::Tracker,
+    },
+    realsense::Realsense,
+    utils::{cv_pipeline, load_image},
+    vk_init,
 };
-use crate::processing_elements::{input::Input, ProcessingElement};
-use crate::utils::cv_pipeline;
+
 use anyhow::Result;
+use vulkano::sync::{self, GpuFuture};
 
 fn main() -> Result<()> {
     // let mut realsense = Realsense::open();
 
-    // v3d specs/properties: https://vulkan.gpuinfo.org/displayreport.php?id=13073#properties
+    // v3d specs/properties:
+    //
+    // maxComputeWorkGroupSize: 256
+    // maxImageDimension: 4096
+    // maxPushConstantsSize: 128
+    //
+    // https://vulkan.gpuinfo.org/displayreport.php?id=13073#properties
 
-    let (img_info, img_data) = utils::load_image("j.png");
+    println!("Realsense camera tracker");
+
+    let (img_info, img_data) = load_image("j.png");
 
     // init device
     let (device, mut queues) = vk_init::init();
@@ -33,7 +42,7 @@ fn main() -> Result<()> {
     let mut pe_gsc = Grayscale::new();
 
     let mut pe_hsv = Hsvconv::new();
-    let mut pe_hsv_filter = ColorFilter::new();
+    let mut pe_hsv_filter = ColorFilter::new([0.3, 0.3, 0.3], [1.0, 1.0, 1.0]);
 
     // let pe_conv = Convolution::new(device.clone(), queue.clone(), &pe_hsv_filter);
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);

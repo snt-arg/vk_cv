@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
+    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
-    image::{ImageCreateFlags, ImageUsage, StorageImage},
+    image::StorageImage,
 };
 
 use crate::utils::{create_storage_image, ImageInfo};
@@ -51,7 +51,7 @@ impl ProcessingElement for Input {
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &dyn ProcessingElement,
+        _input: &dyn ProcessingElement,
     ) {
         // output image
         let output_img = create_storage_image(device.clone(), queue.clone(), &self.input_format);

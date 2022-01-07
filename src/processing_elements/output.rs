@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
+    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
     image::{ImageAccess, StorageImage},
 };
@@ -48,7 +48,7 @@ impl ProcessingElement for Output {
     fn build(
         &mut self,
         device: Arc<Device>,
-        queue: Arc<Queue>,
+        _queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         input: &dyn ProcessingElement,
     ) {

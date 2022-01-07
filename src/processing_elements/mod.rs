@@ -44,10 +44,10 @@ pub struct DummyPE {}
 impl ProcessingElement for DummyPE {
     fn build(
         &mut self,
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &dyn ProcessingElement,
+        _device: Arc<Device>,
+        _queue: Arc<Queue>,
+        _builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        _input: &dyn ProcessingElement,
     ) {
         unimplemented!()
     }

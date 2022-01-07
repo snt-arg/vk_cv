@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
     descriptor_set::PersistentDescriptorSet,
@@ -131,8 +131,6 @@ impl ProcessingElement for Tracker {
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         input: &dyn ProcessingElement,
     ) {
-        let local_size = (1, 8);
-
         // input image
         let input_img = input.output_image().unwrap();
 
