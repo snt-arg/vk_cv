@@ -11,14 +11,14 @@ layout(push_constant) uniform PushConstants {
 pc;
 
 void main() {
-  uvec2 id = gl_GlobalInvocationID.xy;
+  ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 
-  vec3 rgb = imageLoad(inputImage, ivec2(id.x, id.y)).rgb;
+  vec3 rgb = imageLoad(inputImage, id).rgb;
+
   float v = 0;
-
   if (all(greaterThan(rgb, pc.rgb_min)) && all(lessThan(rgb, pc.rgb_max))) {
     v = 1.0;
   }
 
-  imageStore(resultImage, ivec2(id.xy), vec4(v));
+  imageStore(resultImage, id, vec4(v));
 }

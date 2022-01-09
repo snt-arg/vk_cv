@@ -26,18 +26,18 @@ float op(in float a, in float b) {
 }
 
 void main() {
-  uvec2 id = gl_GlobalInvocationID.xy;
+  ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 
-  float avg[9];
-  avg[0] = m11 * imageLoad(inputImage, ivec2(id.x - 1, id.y - 1)).r;
-  avg[1] = m12 * imageLoad(inputImage, ivec2(id.x - 1, id.y - 0)).r;
-  avg[2] = m13 * imageLoad(inputImage, ivec2(id.x - 1, id.y + 1)).r;
-  avg[3] = m21 * imageLoad(inputImage, ivec2(id.x - 0, id.y - 1)).r;
-  avg[4] = m22 * imageLoad(inputImage, ivec2(id.x - 0, id.y - 0)).r;
-  avg[5] = m23 * imageLoad(inputImage, ivec2(id.x - 0, id.y + 1)).r;
-  avg[6] = m31 * imageLoad(inputImage, ivec2(id.x + 1, id.y - 1)).r;
-  avg[7] = m32 * imageLoad(inputImage, ivec2(id.x + 1, id.y - 0)).r;
-  avg[8] = m33 * imageLoad(inputImage, ivec2(id.x + 1, id.y + 1)).r;
+  float avg[9] =
+      float[](m11 * imageLoad(inputImage, ivec2(id.x - 1, id.y - 1)).r,
+              m12 * imageLoad(inputImage, ivec2(id.x - 1, id.y - 0)).r,
+              m13 * imageLoad(inputImage, ivec2(id.x - 1, id.y + 1)).r,
+              m21 * imageLoad(inputImage, ivec2(id.x - 0, id.y - 1)).r,
+              m22 * imageLoad(inputImage, ivec2(id.x - 0, id.y - 0)).r,
+              m23 * imageLoad(inputImage, ivec2(id.x - 0, id.y + 1)).r,
+              m31 * imageLoad(inputImage, ivec2(id.x + 1, id.y - 1)).r,
+              m32 * imageLoad(inputImage, ivec2(id.x + 1, id.y - 0)).r,
+              m33 * imageLoad(inputImage, ivec2(id.x + 1, id.y + 1)).r);
 
   float res = op(avg[0], avg[1]);
   res = op(res, avg[2]);
@@ -48,5 +48,5 @@ void main() {
   res = op(res, avg[7]);
   res = op(res, avg[8]);
 
-  imageStore(resultImage, ivec2(id.xy), vec4(res));
+  imageStore(resultImage, id, vec4(res));
 }
