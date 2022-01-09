@@ -16,7 +16,8 @@ void main() {
   vec3 rgb = imageLoad(inputImage, id).rgb;
 
   float v = 0;
-  if (all(greaterThan(rgb, pc.rgb_min)) && all(lessThan(rgb, pc.rgb_max))) {
+  if (all(greaterThanEqual(rgb, pc.rgb_min)) &&
+      all(lessThanEqual(rgb, pc.rgb_max))) {
     v = 1.0;
   }
 

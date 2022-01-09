@@ -156,8 +156,8 @@ impl Tracker {
                 device.clone(),
                 shader.entry_point("main").unwrap(),
                 &cs_cm::SpecializationConstants {
-                    inv_width: 1.0 / input_img.dimensions().width() as f32,
-                    inv_height: 1.0 / input_img.dimensions().height() as f32,
+                    inv_width: 1.0 / sub_dims[0] as f32,
+                    inv_height: 1.0 / sub_dims[1] as f32,
                     ..Default::default()
                 },
                 None,
@@ -207,6 +207,7 @@ impl Tracker {
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         mut input_img: Arc<StorageImage>,
+        reduce_4x: bool,
     ) -> Arc<StorageImage> {
         let size = input_img.dimensions().width_height();
         assert_eq!(size[0], size[1]);
@@ -215,16 +216,18 @@ impl Tracker {
         let divs_by_4 = (divs_by_2 as f32 / 2.0).floor() as u32;
         let remaining_divs_by_2 = divs_by_2 - (divs_by_4 * 2);
 
-        // for _ in 0..divs_by_2 {
-        //     input_img = Self::reduce_2x(device.clone(), queue.clone(), builder, input_img);
-        // }
+        if reduce_4x {
+            for _ in 0..divs_by_4 {
+                input_img = Self::reduce_4x(device.clone(), queue.clone(), builder, input_img);
+            }
 
-        for _ in 0..divs_by_4 {
-            input_img = Self::reduce_4x(device.clone(), queue.clone(), builder, input_img);
-        }
-
-        for _ in 0..remaining_divs_by_2 {
-            input_img = Self::reduce_2x(device.clone(), queue.clone(), builder, input_img);
+            for _ in 0..remaining_divs_by_2 {
+                input_img = Self::reduce_2x(device.clone(), queue.clone(), builder, input_img);
+            }
+        } else {
+            for _ in 0..divs_by_2 {
+                input_img = Self::reduce_2x(device.clone(), queue.clone(), builder, input_img);
+            }
         }
 
         input_img
@@ -292,7 +295,6 @@ impl Tracker {
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
         let output_img_view = ImageView::new(output_img.clone()).unwrap();
 
-        //set_builder.add_image(input_img_view).unwrap();
         set_builder
             .add_sampled_image(input_img_view, sampler)
             .unwrap();
@@ -339,7 +341,7 @@ impl Tracker {
                 &cs_4x::SpecializationConstants {
                     constant_0: local_size[0],
                     constant_1: local_size[1],
-                    inv_size: 1.0 / (out_size as f32),
+                    inv_size: 1.0 / (in_size as f32),
                     ..Default::default()
                 },
                 None,
@@ -448,7 +450,7 @@ impl ProcessingElement for Tracker {
         );
 
         // scale down to 1x1 px
-        let output_img = Self::reduce(device, queue, builder, output_img.clone());
+        let output_img = Self::reduce(device, queue, builder, output_img.clone(), self.reduce_4x);
 
         self.input_img = Some(input_img);
         self.output_img = Some(output_img);

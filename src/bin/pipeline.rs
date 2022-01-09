@@ -31,7 +31,7 @@ fn main() -> Result<()> {
 
     println!("Realsense camera tracker");
 
-    let (img_info, img_data) = load_image("j.png");
+    let (img_info, img_data) = load_image("tracking_2.png");
 
     // init device
     let (device, mut queues) = vk_init::init();
@@ -42,46 +42,50 @@ fn main() -> Result<()> {
     let mut pe_gsc = Grayscale::new();
 
     let mut pe_hsv = Hsvconv::new();
-    let mut pe_hsv_filter = ColorFilter::new([0.3, 0.3, 0.3], [1.0, 1.0, 1.0]);
+    let mut pe_hsv_filter = ColorFilter::new([0.235, 0.419, 0.239], [0.329, 1.0, 1.0]);
 
     // let pe_conv = Convolution::new(device.clone(), queue.clone(), &pe_hsv_filter);
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
     let mut pe_erode = Morphology::new(Operation::Erode);
     let mut pe_dilate = Morphology::new(Operation::Dilate);
-    let mut pe_tracker = Tracker::new(true, false);
+    let mut pe_tracker = Tracker::new(false, false);
     let mut pe_out = Output::new();
 
     let pipeline_cb = cv_pipeline(
         device.clone(),
         queue.clone(),
         &mut pe_input,
-        &mut [&mut pe_gsc, &mut pe_erode, &mut pe_dilate, &mut pe_tracker],
+        &mut [
+            &mut pe_hsv,
+            &mut pe_hsv_filter,
+            &mut pe_erode,
+            &mut pe_dilate,
+            &mut pe_tracker,
+        ],
         &mut pe_out,
     );
 
-    for i in 0..200 {
-        // let color_image = realsense.fetch_image();
-        //println!("{} x {}", color_image.width(), color_image.height());
-        let pipeline_started = std::time::Instant::now();
+    // let color_image = realsense.fetch_image();
+    //println!("{} x {}", color_image.width(), color_image.height());
+    let pipeline_started = std::time::Instant::now();
 
-        // upload image to GPU
-        pe_input.copy_input_data(&img_data);
+    // upload image to GPU
+    pe_input.copy_input_data(&img_data);
 
-        // process on GPU
-        let future = sync::now(device.clone())
-            .then_execute(queue.clone(), pipeline_cb.clone())
-            .unwrap()
-            .then_signal_fence_and_flush()
-            .unwrap();
+    // process on GPU
+    let future = sync::now(device.clone())
+        .then_execute(queue.clone(), pipeline_cb.clone())
+        .unwrap()
+        .then_signal_fence_and_flush()
+        .unwrap();
 
-        // wait till finished
-        future.wait(None).unwrap();
-        let pipeline_dt = std::time::Instant::now() - pipeline_started;
-        println!("Pipeline took {} us", pipeline_dt.as_micros());
+    // wait till finished
+    future.wait(None).unwrap();
+    let pipeline_dt = std::time::Instant::now() - pipeline_started;
+    println!("Pipeline took {} us", pipeline_dt.as_micros());
 
-        if i == 0 {
-            pe_out.save_output_buffer(&format!("out_{}.png", i));
-        }
-    }
+    pe_out.save_output_buffer("out_0.png");
+    dbg!(pe_out.centeroid());
+
     Ok(())
 }
