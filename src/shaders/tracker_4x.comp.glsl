@@ -9,21 +9,28 @@ layout(constant_id = 2) const float inv_size = 1.0;
 void main() {
   ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 
-  // the coordinate in the bigger (input) picture
-  vec2 coord = vec2(id * 4) * inv_size;
+  // scale down by a factor of two by sampling between the
+  // texels, thus getting the average of the 4 neighbouring
+  // texels which we then average.
+  //
+  // [0,0]---[1,0]---[2,0]---[3,0]
+  //   |   x   |       |   x   |      sample locations
+  // [0,1]---[1,1]---[2,1]---[3,1]
+  //   |       |       |       |
+  // [0,2]---[1,3]---[2,3]---[3,3]
+  //   |   x   |       |   x   |      sample locations
+  // [0,4]---[1,4]---[2,4]---[3,4]
 
-  const vec2 dp0 = vec2(0.5, 0.5) * inv_size;
-  const vec2 dp1 = vec2(1.5, 0.5) * inv_size;
-  const vec2 dp2 = vec2(0.5, 1.5) * inv_size;
-  const vec2 dp3 = vec2(1.5, 1.5) * inv_size;
+  const vec2 dp0 = vec2(0.5, 0.5);
+  const vec2 dp1 = vec2(1.5, 0.5);
+  const vec2 dp2 = vec2(0.5, 1.5);
+  const vec2 dp3 = vec2(1.5, 1.5);
 
   // scale down by a factor of 4
-  vec3 p0 = texture(inputImageSampler, coord + dp0).rgb;
-  vec3 p1 = texture(inputImageSampler, coord + dp1).rgb;
-  vec3 p2 = texture(inputImageSampler, coord + dp2).rgb;
-  vec3 p3 = texture(inputImageSampler, coord + dp3).rgb;
+  vec4 d = texture(inputImageSampler, (id + dp0) * inv_size);
+  d += texture(inputImageSampler, (id + dp1) * inv_size);
+  d += texture(inputImageSampler, (id + dp2) * inv_size);
+  d += texture(inputImageSampler, (id + dp3) * inv_size);
 
-  vec3 d = (p0 + p1 + p2 + p3) * 0.25;
-
-  imageStore(resultImage, id.xy, vec4(d, 0));
+  imageStore(resultImage, id, d * 0.25);
 }

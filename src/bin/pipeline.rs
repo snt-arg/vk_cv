@@ -31,7 +31,7 @@ fn main() -> Result<()> {
 
     println!("Realsense camera tracker");
 
-    let (img_info, img_data) = load_image("tracking_2.png");
+    let (img_info, img_data) = load_image("tracking_3.png");
 
     // init device
     let (device, mut queues) = vk_init::init();
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
     let mut pe_erode = Morphology::new(Operation::Erode);
     let mut pe_dilate = Morphology::new(Operation::Dilate);
-    let mut pe_tracker = Tracker::new(false, false);
+    let mut pe_tracker = Tracker::new(true, false);
     let mut pe_out = Output::new();
 
     let pipeline_cb = cv_pipeline(

@@ -13,13 +13,9 @@ void main() {
   // texels, thus getting the average of the 4 neighbouring
   // texels.
   //
-  // [0,0]---[1,0]---[2,0]---[3,0]
-  //   |   x   |       |   x   |     sample locations
-  // [0,1]---[1,1]---[2,1]---[3,1]
-  //   |       |       |       |
-  // [0,2]---[1,3]---[2,3]---[3,3]
-  //   |   x   |       |   x   |      sample locations
-  // [0,4]---[1,4]---[2,4]---[3,4]
+  // [0,0]---[1,0]
+  //   |   x   |     sample locations
+  // [0,1]---[1,1]
 
   // normalized texture coords
   vec2 uv = (id + vec2(0.5)) * inv_size;

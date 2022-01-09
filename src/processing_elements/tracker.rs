@@ -341,7 +341,7 @@ impl Tracker {
                 &cs_4x::SpecializationConstants {
                     constant_0: local_size[0],
                     constant_1: local_size[1],
-                    inv_size: 1.0 / (in_size as f32),
+                    inv_size: 1.0 / (out_size as f32),
                     ..Default::default()
                 },
                 None,
