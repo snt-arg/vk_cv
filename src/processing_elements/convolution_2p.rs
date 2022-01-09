@@ -7,7 +7,7 @@ use vulkano::{
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 
-use crate::utils::create_storage_image;
+use crate::utils;
 
 use super::ProcessingElement;
 
@@ -98,9 +98,10 @@ impl ProcessingElement for Convolution2Pass {
 
         // output image for first pass
         let intermediate_img =
-            create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
+            utils::create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
         // output image for second pass
-        let output_img = create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
+        let output_img =
+            utils::create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
 
         // setup layout
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
@@ -141,11 +142,10 @@ impl ProcessingElement for Convolution2Pass {
                 set_1p.clone(),
             )
             // .push_constants(pipeline.layout().clone(), 0, push_constants)
-            .dispatch([
-                input_img.dimensions().width() / local_size,
-                input_img.dimensions().height() / local_size,
-                1,
-            ])
+            .dispatch(utils::workgroups(
+                &input_img.dimensions().width_height(),
+                &[local_size, local_size],
+            ))
             .unwrap()
             .bind_pipeline_compute(pipeline_2p.clone())
             .bind_descriptor_sets(
@@ -155,11 +155,10 @@ impl ProcessingElement for Convolution2Pass {
                 set_2p.clone(),
             )
             // .push_constants(pipeline.layout().clone(), 0, push_constants)
-            .dispatch([
-                input_img.dimensions().width() / local_size,
-                input_img.dimensions().height() / local_size,
-                1,
-            ])
+            .dispatch(utils::workgroups(
+                &input_img.dimensions().width_height(),
+                &[local_size, local_size],
+            ))
             .unwrap();
 
         self.input_img = Some(input_img);

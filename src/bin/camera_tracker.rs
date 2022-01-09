@@ -1,9 +1,6 @@
 use vkcv::{
     processing_elements::{
         color_filter::ColorFilter,
-        convolution::Convolution,
-        convolution_2p::Convolution2Pass,
-        grayscale::Grayscale,
         hsvconv::Hsvconv,
         input::Input,
         morphology::{Morphology, Operation},
@@ -11,7 +8,7 @@ use vkcv::{
         tracker::Tracker,
     },
     realsense::Realsense,
-    utils::{cv_pipeline, load_image},
+    utils::cv_pipeline,
     vk_init,
 };
 
@@ -19,8 +16,6 @@ use anyhow::Result;
 use vulkano::sync::{self, GpuFuture};
 
 fn main() -> Result<()> {
-    // let mut realsense = Realsense::open();
-
     // v3d specs/properties:
     //
     // maxComputeWorkGroupSize: 256
@@ -29,43 +24,53 @@ fn main() -> Result<()> {
     //
     // https://vulkan.gpuinfo.org/displayreport.php?id=13073#properties
 
+    std::env::set_var("DISPLAY", ":0");
+
     println!("Realsense camera tracker");
 
-    let (img_info, img_data) = load_image("j.png");
+    let mut realsense = Realsense::open();
+
+    // grab a couple of frames
+    for _ in 0..5 {
+        realsense.fetch_image();
+    }
+
+    let img_info = realsense.fetch_image().image_info();
 
     // init device
     let (device, mut queues) = vk_init::init();
     let queue = queues.next().unwrap();
 
-    // create a convolution pipeline
+    // create a color tracking pipeline
     let mut pe_input = Input::new(img_info);
-    let mut pe_gsc = Grayscale::new();
-
     let mut pe_hsv = Hsvconv::new();
-    let mut pe_hsv_filter = ColorFilter::new([0.3, 0.3, 0.3], [1.0, 1.0, 1.0]);
-
-    // let pe_conv = Convolution::new(device.clone(), queue.clone(), &pe_hsv_filter);
-    // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
+    let mut pe_hsv_filter = ColorFilter::new([0.235, 0.419, 0.239], [0.329, 1.0, 1.0]);
     let mut pe_erode = Morphology::new(Operation::Erode);
     let mut pe_dilate = Morphology::new(Operation::Dilate);
-    let mut pe_tracker = Tracker::new();
+    let mut pe_tracker = Tracker::new(true, false);
     let mut pe_out = Output::new();
 
     let pipeline_cb = cv_pipeline(
         device.clone(),
         queue.clone(),
         &mut pe_input,
-        &mut [&mut pe_gsc, &mut pe_erode, &mut pe_dilate, &mut pe_tracker],
+        &mut [
+            &mut pe_hsv,
+            &mut pe_hsv_filter,
+            &mut pe_erode,
+            &mut pe_dilate,
+            &mut pe_tracker,
+        ],
         &mut pe_out,
     );
 
-    for i in 0..200 {
-        // let color_image = realsense.fetch_image();
-        //println!("{} x {}", color_image.width(), color_image.height());
+    loop {
+        let image = realsense.fetch_image();
+        // println!("{} x {}", image.width(), image.height());
         let pipeline_started = std::time::Instant::now();
 
         // upload image to GPU
-        pe_input.copy_input_data(&img_data);
+        pe_input.copy_input_data(image.data_slice());
 
         // process on GPU
         let future = sync::now(device.clone())
@@ -75,13 +80,16 @@ fn main() -> Result<()> {
             .unwrap();
 
         // wait till finished
+        // std::thread::sleep(std::time::Duration::from_millis(30));
+
+        // this appears to be a spinlock
         future.wait(None).unwrap();
+
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
         println!("Pipeline took {} us", pipeline_dt.as_micros());
 
-        if i == 0 {
-            pe_out.save_output_buffer(&format!("out_{}.png", i));
-        }
+        pe_out.centeroid();
     }
+
     Ok(())
 }

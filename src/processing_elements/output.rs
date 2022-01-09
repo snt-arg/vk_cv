@@ -25,14 +25,30 @@ impl Output {
 
     pub fn save_output_buffer(&self, filename: &str) {
         let buffer_content = self.output_buffer.as_ref().unwrap().read().unwrap();
+        let input_img = self.input_img.as_ref().unwrap();
 
         let info = ImageInfo {
-            width: self.input_img.as_ref().unwrap().dimensions().width(),
-            height: self.input_img.as_ref().unwrap().dimensions().height(),
-            format: self.input_img.as_ref().unwrap().format(),
+            width: input_img.dimensions().width(),
+            height: input_img.dimensions().height(),
+            format: input_img.format(),
         };
 
         utils::write_image(filename, &buffer_content, info);
+    }
+
+    pub fn centeroid(&self) -> [f32; 2] {
+        let data = self.output_buffer.as_ref().unwrap().read().unwrap();
+
+        let x = f32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        // dbg!(x);
+        let y = f32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        // dbg!(y);
+        let z = f32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+        // dbg!(z);
+
+        // dbg!(x / z, y / z);
+
+        [x / z, y / z]
     }
 }
 

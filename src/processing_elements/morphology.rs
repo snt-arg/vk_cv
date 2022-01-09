@@ -7,7 +7,7 @@ use vulkano::{
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 
-use crate::utils::create_storage_image;
+use crate::utils;
 
 use super::ProcessingElement;
 
@@ -81,7 +81,8 @@ impl ProcessingElement for Morphology {
         let input_img = input.output_image().unwrap();
 
         // output image
-        let output_img = create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
+        let output_img =
+            utils::create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
 
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
@@ -111,11 +112,10 @@ impl ProcessingElement for Morphology {
                 set.clone(),
             )
             // .push_constants(pipeline.layout().clone(), 0, push_constants)
-            .dispatch([
-                input_img.dimensions().width() / local_size,
-                input_img.dimensions().height() / local_size,
-                1,
-            ])
+            .dispatch(utils::workgroups(
+                &input_img.dimensions().width_height(),
+                &[local_size, local_size],
+            ))
             .unwrap();
 
         self.input_img = Some(input_img);

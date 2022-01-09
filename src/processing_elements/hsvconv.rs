@@ -7,7 +7,7 @@ use vulkano::{
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 
-use crate::utils::create_storage_image;
+use crate::utils::{self};
 
 use super::ProcessingElement;
 
@@ -64,7 +64,8 @@ impl ProcessingElement for Hsvconv {
         let input_img = input.output_image().unwrap();
 
         // output image
-        let output_img = create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
+        let output_img =
+            utils::create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
 
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
@@ -87,11 +88,10 @@ impl ProcessingElement for Hsvconv {
                 0,
                 set.clone(),
             )
-            .dispatch([
-                input_img.dimensions().width() / 16,
-                input_img.dimensions().height() / 16,
-                1,
-            ])
+            .dispatch(utils::workgroups(
+                &input_img.dimensions().width_height(),
+                &[16, 16],
+            ))
             .unwrap();
 
         self.input_img = Some(input_img);

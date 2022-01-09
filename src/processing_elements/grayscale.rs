@@ -8,7 +8,7 @@ use vulkano::{
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 
-use crate::utils::{create_storage_image, ImageInfo};
+use crate::utils::{self, ImageInfo};
 
 use super::ProcessingElement;
 
@@ -65,7 +65,7 @@ impl ProcessingElement for Grayscale {
         let input_img = input.output_image().unwrap();
 
         // output image
-        let output_img = create_storage_image(
+        let output_img = utils::create_storage_image(
             device.clone(),
             queue.clone(),
             &ImageInfo::from_image(&input_img, Format::R8_UNORM),
@@ -92,11 +92,10 @@ impl ProcessingElement for Grayscale {
                 0,
                 set.clone(),
             )
-            .dispatch([
-                input_img.dimensions().width() / 16,
-                input_img.dimensions().height() / 16,
-                1,
-            ])
+            .dispatch(utils::workgroups(
+                &input_img.dimensions().width_height(),
+                &[16, 16],
+            ))
             .unwrap();
 
         self.input_img = Some(input_img);

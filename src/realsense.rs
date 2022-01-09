@@ -1,6 +1,9 @@
 use std::{ffi::c_void, ptr};
 
 use realsense_sys::*;
+use vulkano::format::Format::R8G8B8A8_UNORM;
+
+use crate::utils::ImageInfo;
 
 #[derive(Debug)]
 pub struct Realsense {
@@ -114,6 +117,44 @@ impl Frame {
             let ptr = rs2_get_frame_data(self.frame, ptr::null_mut()) as *const u8;
             std::slice::from_raw_parts(ptr, self.bytes_count() as usize)
         }
+    }
+
+    pub fn image_info(&self) -> ImageInfo {
+        ImageInfo {
+            width: self.width(),
+            height: self.height(),
+            format: R8G8B8A8_UNORM,
+        }
+    }
+
+    pub fn stride(&self) -> u32 {
+        unsafe { rs2_get_frame_stride_in_bytes(self.frame, ptr::null_mut()) as u32 }
+    }
+
+    pub fn crop(&self, new_width: u32, new_height: u32) -> (ImageInfo, Vec<u8>) {
+        let mut data = vec![0; (new_width * new_height * 4) as usize];
+        let old_data = self.data_slice();
+        let stride = new_width * 4;
+        let old_stride = self.stride();
+
+        for y in 0..new_height.min(self.height()) {
+            let offset = (y * stride) as usize;
+            let (_, right) = data.split_at_mut(offset);
+
+            let old_offset_from = (y * old_stride) as usize;
+            let count = self.width().min(new_width);
+            let old_offset_to = old_offset_from + count as usize;
+            right.copy_from_slice(&old_data[old_offset_from..old_offset_to]);
+        }
+
+        (
+            ImageInfo {
+                width: new_width,
+                height: new_height,
+                format: self.image_info().format,
+            },
+            data.to_vec(),
+        )
     }
 }
 

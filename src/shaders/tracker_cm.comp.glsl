@@ -8,12 +8,12 @@ layout(constant_id = 3) const float inv_width = 1.0;
 layout(constant_id = 4) const float inv_height = 1.0;
 
 void main() {
-  uvec2 id = gl_GlobalInvocationID.xy;
-  uvec2 wgs = gl_WorkGroupSize.xy;
+  ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+  const vec2 inv_size = vec2(inv_width, inv_height);
 
   // coordinate mask
-  float r = imageLoad(inputImage, ivec2(id.xy)).r;
-  vec2 d = r * vec2(id.xy) * vec2(inv_width, inv_height);
+  float r = imageLoad(inputImage, id).r;
+  vec2 d = r * vec2(id) * inv_size;
 
-  imageStore(resultImage, ivec2(id.xy), vec4(d, r, 0));
+  imageStore(resultImage, id, vec4(d, r, 0));
 }

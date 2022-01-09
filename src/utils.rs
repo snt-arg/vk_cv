@@ -101,6 +101,7 @@ pub fn create_storage_image(
         transfer_source: true,
         transfer_destination: true,
         storage: true,
+        sampled: true,
         ..ImageUsage::none()
     };
     let flags = ImageCreateFlags::none();
@@ -120,7 +121,49 @@ pub fn create_storage_image(
     .unwrap()
 }
 
+pub fn workgroups(dimensions: &[u32; 2], local_size: &[u32; 2]) -> [u32; 3] {
+    [
+        (dimensions[0] as f32 / local_size[0] as f32).ceil() as u32,
+        (dimensions[1] as f32 / local_size[1] as f32).ceil() as u32,
+        1,
+    ]
+}
+
 pub fn cv_pipeline<I, O>(
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    input: &mut I,
+    elements: &mut [&mut dyn ProcessingElement],
+    output: &mut O,
+) -> Arc<PrimaryAutoCommandBuffer>
+where
+    I: PipeInput + ProcessingElement,
+    O: PipeOutput + ProcessingElement,
+{
+    let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
+        device.clone(),
+        queue.family(),
+        vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
+    )
+    .unwrap();
+
+    let dummy = crate::processing_elements::DummyPE {};
+    input.build(device.clone(), queue.clone(), &mut builder, &dummy);
+
+    let mut last_pe: &dyn ProcessingElement = input;
+
+    for pe in elements {
+        pe.build(device.clone(), queue.clone(), &mut builder, last_pe);
+        last_pe = *pe;
+    }
+
+    output.build(device.clone(), queue.clone(), &mut builder, last_pe);
+
+    let command_buffer = Arc::new(builder.build().unwrap());
+    command_buffer
+}
+
+pub fn cv_pipeline_debug<I, O>(
     device: Arc<Device>,
     queue: Arc<Queue>,
     input: &mut I,
