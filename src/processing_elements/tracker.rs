@@ -30,35 +30,41 @@ mod cs_cm {
 }
 
 // subsequent passes: scale down 2x
-mod cs_2x {
+mod cs_pool2 {
     vulkano_shaders::shader! {
         ty: "compute",
-        path: "src/shaders/tracker_2x.comp.glsl",
+        path: "src/shaders/mean_pooling_2.comp.glsl",
     }
 }
 
 // subsequent passes: scale down 4x
-mod cs_4x {
+mod cs_pool4 {
     vulkano_shaders::shader! {
         ty: "compute",
-        path: "src/shaders/tracker_4x.comp.glsl",
+        path: "src/shaders/mean_pooling_4.comp.glsl",
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PoolingStrategy {
+    PreferPooling4,
+    Pooling2Only,
 }
 
 pub struct Tracker {
     input_img: Option<Arc<StorageImage>>,
     output_img: Option<Arc<StorageImage>>,
 
-    reduce_4x: bool,
+    pooling_strategy: PoolingStrategy,
     crop: bool,
 }
 
 impl Tracker {
-    pub fn new(reduce_4x: bool, crop: bool) -> Self {
+    pub fn new(pooling_strategy: PoolingStrategy, crop: bool) -> Self {
         Self {
             input_img: None,
             output_img: None,
-            reduce_4x,
+            pooling_strategy,
             crop,
         }
     }
@@ -202,12 +208,12 @@ impl Tracker {
         output_img
     }
 
-    fn reduce(
+    fn pooling(
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         mut input_img: Arc<StorageImage>,
-        reduce_4x: bool,
+        pooling_strategy: PoolingStrategy,
     ) -> Arc<StorageImage> {
         let size = input_img.dimensions().width_height();
         assert_eq!(size[0], size[1]);
@@ -216,24 +222,27 @@ impl Tracker {
         let divs_by_4 = (divs_by_2 as f32 / 2.0).floor() as u32;
         let remaining_divs_by_2 = divs_by_2 - (divs_by_4 * 2);
 
-        if reduce_4x {
-            for _ in 0..divs_by_4 {
-                input_img = Self::reduce_4x(device.clone(), queue.clone(), builder, input_img);
-            }
+        match pooling_strategy {
+            PoolingStrategy::PreferPooling4 => {
+                for _ in 0..divs_by_4 {
+                    input_img = Self::pooling4(device.clone(), queue.clone(), builder, input_img);
+                }
 
-            for _ in 0..remaining_divs_by_2 {
-                input_img = Self::reduce_2x(device.clone(), queue.clone(), builder, input_img);
+                for _ in 0..remaining_divs_by_2 {
+                    input_img = Self::pooling2(device.clone(), queue.clone(), builder, input_img);
+                }
             }
-        } else {
-            for _ in 0..divs_by_2 {
-                input_img = Self::reduce_2x(device.clone(), queue.clone(), builder, input_img);
+            PoolingStrategy::Pooling2Only => {
+                for _ in 0..divs_by_2 {
+                    input_img = Self::pooling2(device.clone(), queue.clone(), builder, input_img);
+                }
             }
         }
 
         input_img
     }
 
-    fn reduce_2x(
+    fn pooling2(
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -246,11 +255,11 @@ impl Tracker {
         dbg!(local_size);
 
         let pipeline = {
-            let shader = cs_2x::load(device.clone()).unwrap();
+            let shader = cs_pool2::load(device.clone()).unwrap();
             ComputePipeline::new(
                 device.clone(),
                 shader.entry_point("main").unwrap(),
-                &cs_2x::SpecializationConstants {
+                &cs_pool2::SpecializationConstants {
                     constant_0: local_size[0],
                     constant_1: local_size[1],
                     inv_size: 1.0 / (out_size as f32),
@@ -321,7 +330,7 @@ impl Tracker {
         output_img
     }
 
-    fn reduce_4x(
+    fn pooling4(
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -334,11 +343,11 @@ impl Tracker {
         dbg!(local_size);
 
         let pipeline = {
-            let shader = cs_4x::load(device.clone()).unwrap();
+            let shader = cs_pool4::load(device.clone()).unwrap();
             ComputePipeline::new(
                 device.clone(),
                 shader.entry_point("main").unwrap(),
-                &cs_4x::SpecializationConstants {
+                &cs_pool4::SpecializationConstants {
                     constant_0: local_size[0],
                     constant_1: local_size[1],
                     inv_size: 1.0 / (out_size as f32),
@@ -450,7 +459,13 @@ impl ProcessingElement for Tracker {
         );
 
         // scale down to 1x1 px
-        let output_img = Self::reduce(device, queue, builder, output_img.clone(), self.reduce_4x);
+        let output_img = Self::pooling(
+            device,
+            queue,
+            builder,
+            output_img.clone(),
+            self.pooling_strategy,
+        );
 
         self.input_img = Some(input_img);
         self.output_img = Some(output_img);

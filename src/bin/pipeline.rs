@@ -8,7 +8,7 @@ use vkcv::{
         input::Input,
         morphology::{Morphology, Operation},
         output::Output,
-        tracker::Tracker,
+        tracker::{PoolingStrategy, Tracker},
     },
     realsense::Realsense,
     utils::{cv_pipeline, load_image},
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
 
     println!("Realsense camera tracker");
 
-    let (img_info, img_data) = load_image("tracking_3.png");
+    let (img_info, img_data) = load_image("cube_1.png");
 
     // init device
     let (device, mut queues) = vk_init::init();
@@ -42,13 +42,13 @@ fn main() -> Result<()> {
     let mut pe_gsc = Grayscale::new();
 
     let mut pe_hsv = Hsvconv::new();
-    let mut pe_hsv_filter = ColorFilter::new([0.235, 0.419, 0.239], [0.329, 1.0, 1.0]);
+    let mut pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
 
     // let pe_conv = Convolution::new(device.clone(), queue.clone(), &pe_hsv_filter);
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
     let mut pe_erode = Morphology::new(Operation::Erode);
     let mut pe_dilate = Morphology::new(Operation::Dilate);
-    let mut pe_tracker = Tracker::new(true, false);
+    let mut pe_tracker = Tracker::new(PoolingStrategy::PreferPooling4, false);
     let mut pe_out = Output::new();
 
     let pipeline_cb = cv_pipeline(
