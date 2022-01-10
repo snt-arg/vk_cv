@@ -1,7 +1,13 @@
 {
     "ros.distro": "noetic",
     "cSpell.words": [
+        "divs",
+        "glsl",
+        "Mipmap",
         "realsense",
-        "vulkano"
+        "SFLOAT",
+        "UNORM",
+        "vulkano",
+        "workgroups"
     ]
 }

@@ -91,7 +91,7 @@ fn main() -> Result<()> {
         future.wait(None).unwrap();
 
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
-        let c = pe_out.centeroid();
+        let c = pe_out.centroid();
         println!(
             "Pipeline took {} ms, coords ({},{})",
             pipeline_dt.as_millis(),

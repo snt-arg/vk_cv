@@ -85,7 +85,7 @@ fn main() -> Result<()> {
     println!("Pipeline took {} us", pipeline_dt.as_micros());
 
     pe_out.save_output_buffer("out_0.png");
-    dbg!(pe_out.centeroid());
+    dbg!(pe_out.centroid());
 
     Ok(())
 }

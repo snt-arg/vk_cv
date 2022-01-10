@@ -36,7 +36,7 @@ impl Output {
         utils::write_image(filename, &buffer_content, info);
     }
 
-    pub fn centeroid(&self) -> [f32; 2] {
+    pub fn centroid(&self) -> [f32; 2] {
         let data = self.output_buffer.as_ref().unwrap().read().unwrap();
 
         let x = f32::from_le_bytes([data[0], data[1], data[2], data[3]]);
