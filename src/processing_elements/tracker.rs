@@ -252,7 +252,6 @@ impl Tracker {
         let out_size = in_size / 2;
 
         let local_size = [out_size.min(16), out_size.min(16)];
-        dbg!(local_size);
 
         let pipeline = {
             let shader = cs_pool2::load(device.clone()).unwrap();
@@ -313,7 +312,6 @@ impl Tracker {
 
         // let workgroups =  (out_size as f32 / local_size as f32).ceil() as u32;
         let workgroups = utils::workgroups(&output_img.dimensions().width_height(), &local_size);
-        dbg!(workgroups);
 
         // build command buffer
         builder
@@ -340,7 +338,6 @@ impl Tracker {
         let out_size = in_size / 4;
 
         let local_size = [out_size.min(16), out_size.min(16)];
-        dbg!(local_size);
 
         let pipeline = {
             let shader = cs_pool4::load(device.clone()).unwrap();
@@ -402,7 +399,6 @@ impl Tracker {
 
         // let workgroups =  (out_size as f32 / local_size as f32).ceil() as u32;
         let workgroups = utils::workgroups(&output_img.dimensions().width_height(), &local_size);
-        dbg!(workgroups);
 
         // build command buffer
         builder

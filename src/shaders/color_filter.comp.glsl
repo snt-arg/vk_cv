@@ -15,10 +15,12 @@ void main() {
 
   vec3 rgb = imageLoad(inputImage, id).rgb;
 
-  float v = 0;
+  float v;
   if (all(greaterThanEqual(rgb, pc.rgb_min)) &&
       all(lessThanEqual(rgb, pc.rgb_max))) {
     v = 1.0;
+  } else {
+    v = 0.0;
   }
 
   imageStore(resultImage, id, vec4(v));

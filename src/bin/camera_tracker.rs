@@ -32,6 +32,7 @@ fn main() -> Result<()> {
 
     // set the default display, otherwise we fallback to llvmpipe
     std::env::set_var("DISPLAY", ":0");
+    std::env::set_var("V3D_DEBUG", "perf");
 
     let mut realsense = Realsense::open();
 
@@ -69,6 +70,39 @@ fn main() -> Result<()> {
         &mut pe_out,
     );
 
+    let mut avg_pipeline_execution_duration = std::time::Duration::ZERO;
+
+    // train
+    for i in 0..30 {
+        // process on GPU
+        let future = sync::now(device.clone())
+            .then_execute(queue.clone(), pipeline_cb.clone())
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap();
+
+        let pipeline_committed = std::time::Instant::now();
+
+        // wait till finished
+        future.wait(None).unwrap();
+
+        if i >= 10 {
+            if avg_pipeline_execution_duration.is_zero() {
+                avg_pipeline_execution_duration = std::time::Instant::now() - pipeline_committed;
+            }
+
+            avg_pipeline_execution_duration = std::time::Duration::from_secs_f32(
+                avg_pipeline_execution_duration.as_secs_f32() * 0.9
+                    + 0.1 * (std::time::Instant::now() - pipeline_committed).as_secs_f32(),
+            );
+        }
+    }
+
+    println!(
+        "Average duration: {}",
+        avg_pipeline_execution_duration.as_millis()
+    );
+
     loop {
         let image = realsense.fetch_image();
         // println!("{} x {}", image.width(), image.height());
@@ -85,15 +119,13 @@ fn main() -> Result<()> {
             .unwrap();
 
         // wait till finished
-        // std::thread::sleep(std::time::Duration::from_millis(30));
-
-        // this appears to be a spinlock
+        std::thread::sleep(avg_pipeline_execution_duration);
         future.wait(None).unwrap();
 
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
         let c = pe_out.centroid();
         println!(
-            "Pipeline took {} ms, coords ({},{})",
+            "Pipeline flushed: {} ms, coords ({},{})",
             pipeline_dt.as_millis(),
             c[0],
             c[1]

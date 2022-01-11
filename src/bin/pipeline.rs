@@ -31,6 +31,9 @@ fn main() -> Result<()> {
 
     println!("Realsense camera tracker");
 
+    std::env::set_var("DISPLAY", ":0");
+    std::env::set_var("V3D_DEBUG", "perf");
+
     let (img_info, img_data) = load_image("cube_1.png");
 
     // init device

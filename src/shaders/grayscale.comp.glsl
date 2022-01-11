@@ -5,10 +5,10 @@ layout(set = 0, binding = 0, rgba8) uniform readonly image2D inputImage;
 layout(set = 0, binding = 1, r8) uniform image2D resultImage;
 
 void main() {
-  uvec2 id = gl_GlobalInvocationID.xy;
+  ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 
-  vec3 rgb = imageLoad(inputImage, ivec2(id.x, id.y)).rgb;
+  vec4 rgb = imageLoad(inputImage, id);
   float r = (rgb.r + rgb.g + rgb.b) / 3.0;
 
-  imageStore(resultImage, ivec2(id.xy), vec4(r, 0, 0, 0));
+  imageStore(resultImage, id, vec4(r));
 }

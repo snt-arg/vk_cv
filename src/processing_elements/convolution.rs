@@ -85,14 +85,13 @@ impl ProcessingElement for Convolution {
 
         let set = set_builder.build().unwrap();
 
-        // build command buffer
-
         // let push_constants = cs::ty::PushConstants {
         //     kernel: [-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 2.0],
         //     offset: 1.0,
         //     denom: 0.5,
         // };
 
+        // build command buffer
         builder
             .bind_pipeline_compute(pipeline.clone())
             .bind_descriptor_sets(
