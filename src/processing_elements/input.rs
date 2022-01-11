@@ -3,7 +3,6 @@ use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
-    image::StorageImage,
 };
 
 use crate::utils::{create_storage_image, ImageInfo};
@@ -18,17 +17,6 @@ impl Input {
     pub fn new(input_format: ImageInfo) -> Self {
         Self { input_format }
     }
-
-    // pub fn copy_input_data(&mut self, data: &[u8]) {
-    //     if let Ok(mut lock) = self.input_buffer.as_mut().unwrap().write() {
-    //         let len = lock.len();
-    //         if len < data.len() {
-    //             lock.copy_from_slice(&data[0..len]);
-    //         } else {
-    //             lock.copy_from_slice(data);
-    //         }
-    //     }
-    // }
 }
 
 impl ProcessingElement for Input {

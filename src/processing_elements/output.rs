@@ -3,10 +3,8 @@ use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
-    image::{ImageAccess, StorageImage},
+    image::ImageAccess,
 };
-
-use crate::utils::{self, ImageInfo};
 
 use super::{Io, IoElement, PipeOutput, ProcessingElement};
 

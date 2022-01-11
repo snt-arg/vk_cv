@@ -3,7 +3,7 @@ use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::PersistentDescriptorSet,
     device::{Device, Queue},
-    image::{view::ImageView, ImageAccess, StorageImage},
+    image::{view::ImageView, ImageAccess},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 

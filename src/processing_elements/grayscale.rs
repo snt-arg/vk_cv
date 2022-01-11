@@ -4,7 +4,7 @@ use vulkano::{
     descriptor_set::PersistentDescriptorSet,
     device::{Device, Queue},
     format::Format,
-    image::{view::ImageView, ImageAccess, StorageImage},
+    image::{view::ImageView, ImageAccess},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 
