@@ -6,7 +6,7 @@ use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
 use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
 
-use crate::processing_elements::{PipeInput, PipeOutput, ProcessingElement};
+use crate::processing_elements::{IoElement, PipeInput, PipeOutput, ProcessingElement};
 
 pub struct ImageInfo {
     pub width: u32,
@@ -135,7 +135,7 @@ pub fn cv_pipeline<I, O>(
     input: &mut I,
     elements: &mut [&mut dyn ProcessingElement],
     output: &mut O,
-) -> Arc<PrimaryAutoCommandBuffer>
+) -> (Arc<PrimaryAutoCommandBuffer>, IoElement, IoElement)
 where
     I: PipeInput + ProcessingElement,
     O: PipeOutput + ProcessingElement,
@@ -147,52 +147,27 @@ where
     )
     .unwrap();
 
-    let dummy = crate::processing_elements::DummyPE {};
-    input.build(device.clone(), queue.clone(), &mut builder, &dummy);
+    let dummy = IoElement::dummy();
+    let input_io = input.build(device.clone(), queue.clone(), &mut builder, &dummy);
 
-    let mut last_pe: &dyn ProcessingElement = input;
+    let mut io_elements = vec![input_io.clone()];
 
     for pe in elements {
-        pe.build(device.clone(), queue.clone(), &mut builder, last_pe);
-        last_pe = *pe;
+        io_elements.push(pe.build(
+            device.clone(),
+            queue.clone(),
+            &mut builder,
+            io_elements.last().as_ref().unwrap(),
+        ));
     }
 
-    output.build(device.clone(), queue.clone(), &mut builder, last_pe);
-
-    let command_buffer = Arc::new(builder.build().unwrap());
-    command_buffer
-}
-
-pub fn cv_pipeline_debug<I, O>(
-    device: Arc<Device>,
-    queue: Arc<Queue>,
-    input: &mut I,
-    elements: &mut [&mut dyn ProcessingElement],
-    output: &mut O,
-) -> Arc<PrimaryAutoCommandBuffer>
-where
-    I: PipeInput + ProcessingElement,
-    O: PipeOutput + ProcessingElement,
-{
-    let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
+    let output_io = output.build(
         device.clone(),
-        queue.family(),
-        vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
-    )
-    .unwrap();
-
-    let dummy = crate::processing_elements::DummyPE {};
-    input.build(device.clone(), queue.clone(), &mut builder, &dummy);
-
-    let mut last_pe: &dyn ProcessingElement = input;
-
-    for pe in elements {
-        pe.build(device.clone(), queue.clone(), &mut builder, last_pe);
-        last_pe = *pe;
-    }
-
-    output.build(device.clone(), queue.clone(), &mut builder, last_pe);
+        queue.clone(),
+        &mut builder,
+        io_elements.last().as_ref().unwrap(),
+    );
 
     let command_buffer = Arc::new(builder.build().unwrap());
-    command_buffer
+    (command_buffer, input_io, output_io)
 }

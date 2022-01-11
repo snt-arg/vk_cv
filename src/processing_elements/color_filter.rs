@@ -4,13 +4,13 @@ use vulkano::{
     descriptor_set::PersistentDescriptorSet,
     device::{Device, Queue},
     format::Format,
-    image::{view::ImageView, ImageAccess, StorageImage},
+    image::{view::ImageView, ImageAccess},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 
 use crate::utils::{self, ImageInfo};
 
-use super::ProcessingElement;
+use super::{Io, IoElement, ProcessingElement};
 
 mod cs {
     vulkano_shaders::shader! {
@@ -20,39 +20,24 @@ mod cs {
 }
 
 pub struct ColorFilter {
-    input_img: Option<Arc<StorageImage>>,
-    output_img: Option<Arc<StorageImage>>,
     rgb_min: [f32; 3],
     rgb_max: [f32; 3],
 }
 
 impl ColorFilter {
     pub fn new(rgb_min: [f32; 3], rgb_max: [f32; 3]) -> Self {
-        Self {
-            input_img: None,
-            output_img: None,
-            rgb_min,
-            rgb_max,
-        }
+        Self { rgb_min, rgb_max }
     }
 }
 
 impl ProcessingElement for ColorFilter {
-    fn input_image(&self) -> Option<Arc<StorageImage>> {
-        self.input_img.clone()
-    }
-
-    fn output_image(&self) -> Option<Arc<StorageImage>> {
-        self.output_img.clone()
-    }
-
     fn build(
         &mut self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &dyn ProcessingElement,
-    ) {
+        input: &IoElement,
+    ) -> IoElement {
         let pipeline = {
             let shader = cs::load(device.clone()).unwrap();
             ComputePipeline::new(
@@ -109,7 +94,9 @@ impl ProcessingElement for ColorFilter {
             ))
             .unwrap();
 
-        self.input_img = Some(input_img);
-        self.output_img = Some(output_img);
+        IoElement {
+            input: Io::Image(input_img),
+            output: Io::Image(output_img),
+        }
     }
 }

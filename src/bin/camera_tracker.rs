@@ -1,4 +1,5 @@
 use vkcv::{
+    endpoints::{image_download::ImageDownload, image_upload::ImageUpload},
     processing_elements::{
         color_filter::ColorFilter,
         hsvconv::Hsvconv,
@@ -56,7 +57,7 @@ fn main() -> Result<()> {
     let mut pe_tracker = Tracker::new(PoolingStrategy::PreferPooling4, false);
     let mut pe_out = Output::new();
 
-    let pipeline_cb = cv_pipeline(
+    let (pipeline_cb, input_io, output_io) = cv_pipeline(
         device.clone(),
         queue.clone(),
         &mut pe_input,
@@ -69,6 +70,9 @@ fn main() -> Result<()> {
         ],
         &mut pe_out,
     );
+
+    let upload = ImageUpload::new(input_io);
+    let download = ImageDownload::new(output_io);
 
     let mut avg_pipeline_execution_duration = std::time::Duration::ZERO;
 
@@ -109,7 +113,7 @@ fn main() -> Result<()> {
         let pipeline_started = std::time::Instant::now();
 
         // upload image to GPU
-        pe_input.copy_input_data(image.data_slice());
+        upload.copy_input_data(image.data_slice());
 
         // process on GPU
         let future = sync::now(device.clone())
@@ -123,7 +127,7 @@ fn main() -> Result<()> {
         future.wait(None).unwrap();
 
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
-        let c = pe_out.centroid();
+        let c = download.centroid();
         println!(
             "Pipeline flushed: {} ms, coords ({},{})",
             pipeline_dt.as_millis(),

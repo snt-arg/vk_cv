@@ -10,6 +10,7 @@ pub mod tracker;
 
 use std::sync::Arc;
 use vulkano::{
+    buffer::CpuAccessibleBuffer,
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
     image::StorageImage,
@@ -21,10 +22,8 @@ pub trait ProcessingElement {
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &dyn ProcessingElement,
-    );
-    fn output_image(&self) -> Option<Arc<StorageImage>>;
-    fn input_image(&self) -> Option<Arc<StorageImage>>;
+        input: &IoElement,
+    ) -> IoElement;
 }
 
 // marker trait
@@ -39,24 +38,52 @@ pub trait PipeOutputElement: PipeOutput + ProcessingElement {
 pub trait PipeInput {}
 pub trait PipeInputElement: PipeOutput + ProcessingElement {}
 
-pub struct DummyPE {}
+#[derive(Clone, Debug)]
+pub enum Io {
+    Image(Arc<StorageImage>),
+    Buffer(Arc<CpuAccessibleBuffer<[u8]>>),
+    None,
+}
 
-impl ProcessingElement for DummyPE {
-    fn build(
-        &mut self,
-        _device: Arc<Device>,
-        _queue: Arc<Queue>,
-        _builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        _input: &dyn ProcessingElement,
-    ) {
-        unimplemented!()
+#[derive(Clone)]
+pub struct IoElement {
+    input: Io,
+    output: Io,
+}
+
+impl IoElement {
+    pub fn input_image(&self) -> Option<Arc<StorageImage>> {
+        match &self.input {
+            Io::Image(img) => Some(img.clone()),
+            _ => None,
+        }
     }
 
-    fn output_image(&self) -> Option<Arc<StorageImage>> {
-        None
+    pub fn output_image(&self) -> Option<Arc<StorageImage>> {
+        match &self.output {
+            Io::Image(img) => Some(img.clone()),
+            _ => None,
+        }
     }
 
-    fn input_image(&self) -> Option<Arc<StorageImage>> {
-        None
+    pub fn input_buffer(&self) -> Option<Arc<CpuAccessibleBuffer<[u8]>>> {
+        match &self.input {
+            Io::Buffer(buf) => Some(buf.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn output_buffer(&self) -> Option<Arc<CpuAccessibleBuffer<[u8]>>> {
+        match &self.output {
+            Io::Buffer(buf) => Some(buf.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn dummy() -> Self {
+        Self {
+            input: Io::None,
+            output: Io::None,
+        }
     }
 }

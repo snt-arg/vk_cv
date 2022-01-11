@@ -9,7 +9,7 @@ use vulkano::{
 
 use crate::utils;
 
-use super::ProcessingElement;
+use super::{Io, IoElement, ProcessingElement};
 
 mod cs {
     vulkano_shaders::shader! {
@@ -18,36 +18,22 @@ mod cs {
     }
 }
 
-pub struct Convolution {
-    input_img: Option<Arc<StorageImage>>,
-    output_img: Option<Arc<StorageImage>>,
-}
+pub struct Convolution {}
 
 impl Convolution {
     pub fn new() -> Self {
-        Self {
-            input_img: None,
-            output_img: None,
-        }
+        Self {}
     }
 }
 
 impl ProcessingElement for Convolution {
-    fn input_image(&self) -> Option<Arc<StorageImage>> {
-        self.input_img.clone()
-    }
-
-    fn output_image(&self) -> Option<Arc<StorageImage>> {
-        self.output_img.clone()
-    }
-
     fn build(
         &mut self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &dyn ProcessingElement,
-    ) {
+        input: &IoElement,
+    ) -> IoElement {
         let local_size = 16;
 
         let pipeline = {
@@ -107,7 +93,9 @@ impl ProcessingElement for Convolution {
             ))
             .unwrap();
 
-        self.input_img = Some(input_img);
-        self.output_img = Some(output_img);
+        IoElement {
+            input: Io::Image(input_img),
+            output: Io::Image(output_img),
+        }
     }
 }

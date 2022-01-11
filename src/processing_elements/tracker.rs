@@ -11,7 +11,7 @@ use vulkano::{
 
 use crate::utils::{self, ImageInfo};
 
-use super::ProcessingElement;
+use super::{Io, IoElement, ProcessingElement};
 
 // 0th pass: canvas (power of two)
 mod cs_canvas {
@@ -52,9 +52,6 @@ pub enum PoolingStrategy {
 }
 
 pub struct Tracker {
-    input_img: Option<Arc<StorageImage>>,
-    output_img: Option<Arc<StorageImage>>,
-
     pooling_strategy: PoolingStrategy,
     crop: bool,
 }
@@ -62,8 +59,6 @@ pub struct Tracker {
 impl Tracker {
     pub fn new(pooling_strategy: PoolingStrategy, crop: bool) -> Self {
         Self {
-            input_img: None,
-            output_img: None,
             pooling_strategy,
             crop,
         }
@@ -417,21 +412,13 @@ impl Tracker {
 }
 
 impl ProcessingElement for Tracker {
-    fn input_image(&self) -> Option<Arc<StorageImage>> {
-        self.input_img.clone()
-    }
-
-    fn output_image(&self) -> Option<Arc<StorageImage>> {
-        self.output_img.clone()
-    }
-
     fn build(
         &mut self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &dyn ProcessingElement,
-    ) {
+        input: &IoElement,
+    ) -> IoElement {
         // input image
         let input_img = input.output_image().unwrap();
 
@@ -463,8 +450,10 @@ impl ProcessingElement for Tracker {
             self.pooling_strategy,
         );
 
-        self.input_img = Some(input_img);
-        self.output_img = Some(output_img);
+        IoElement {
+            input: Io::Image(input_img),
+            output: Io::Image(output_img),
+        }
     }
 }
 

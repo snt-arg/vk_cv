@@ -1,4 +1,5 @@
 use vkcv::{
+    endpoints::{image_download::ImageDownload, image_upload::ImageUpload},
     processing_elements::{
         color_filter::ColorFilter,
         convolution::Convolution,
@@ -54,7 +55,7 @@ fn main() -> Result<()> {
     let mut pe_tracker = Tracker::new(PoolingStrategy::PreferPooling4, false);
     let mut pe_out = Output::new();
 
-    let pipeline_cb = cv_pipeline(
+    let (pipeline_cb, input_io, output_io) = cv_pipeline(
         device.clone(),
         queue.clone(),
         &mut pe_input,
@@ -68,12 +69,15 @@ fn main() -> Result<()> {
         &mut pe_out,
     );
 
+    let upload = ImageUpload::new(input_io);
+    let download = ImageDownload::new(output_io);
+
     // let color_image = realsense.fetch_image();
     //println!("{} x {}", color_image.width(), color_image.height());
     let pipeline_started = std::time::Instant::now();
 
     // upload image to GPU
-    pe_input.copy_input_data(&img_data);
+    upload.copy_input_data(&img_data);
 
     // process on GPU
     let future = sync::now(device.clone())
@@ -87,8 +91,8 @@ fn main() -> Result<()> {
     let pipeline_dt = std::time::Instant::now() - pipeline_started;
     println!("Pipeline took {} us", pipeline_dt.as_micros());
 
-    pe_out.save_output_buffer("out_0.png");
-    dbg!(pe_out.centroid());
+    download.save_output_buffer("out_0.png");
+    dbg!(download.centroid());
 
     Ok(())
 }
