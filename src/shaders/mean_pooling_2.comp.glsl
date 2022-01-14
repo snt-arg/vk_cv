@@ -1,7 +1,7 @@
 #version 450
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
-layout(set = 0, binding = 0) uniform sampler2D inputImageSampler; // linear
+layout(set = 0, binding = 0, rgba32f) uniform image2D inputImage;
 layout(set = 0, binding = 1, rgba32f) uniform image2D resultImage;
 
 layout(constant_id = 2) const float inv_size = 1.0; // of the output image
@@ -9,17 +9,14 @@ layout(constant_id = 2) const float inv_size = 1.0; // of the output image
 void main() {
   ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 
-  // scale down by a factor of two by sampling between the
-  // texels, thus getting the average of the 4 neighbouring
-  // texels.
-  //
-  // [0,0]---[1,0]
-  //   |   x   |     sample locations
-  // [0,1]---[1,1]
+  // Note: The RPi misbehaves when using the sampler method
+  //       However, this approach works.
+  //       Furthermore, it has no performance penalty on the RPi.
+  ivec2 p = id * 2;
+  vec4 d = imageLoad(inputImage, p + ivec2(0, 0));
+  d += imageLoad(inputImage, p + ivec2(0, 1));
+  d += imageLoad(inputImage, p + ivec2(1, 0));
+  d += imageLoad(inputImage, p + ivec2(1, 1));
 
-  // normalized texture coords
-  vec2 uv = (id + vec2(0.5)) * inv_size;
-  vec4 d = texture(inputImageSampler, uv);
-
-  imageStore(resultImage, id, d);
+  imageStore(resultImage, id, d * 0.25);
 }

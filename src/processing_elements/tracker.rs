@@ -37,6 +37,13 @@ mod cs_pool2 {
     }
 }
 
+mod cs_pool2_sampler {
+    vulkano_shaders::shader! {
+        ty: "compute",
+        path: "src/shaders/mean_pooling_2.sampler.comp.glsl",
+    }
+}
+
 // subsequent passes: scale down 4x
 mod cs_pool4 {
     vulkano_shaders::shader! {
@@ -45,10 +52,19 @@ mod cs_pool4 {
     }
 }
 
+mod cs_pool4_sampler {
+    vulkano_shaders::shader! {
+        ty: "compute",
+        path: "src/shaders/mean_pooling_4.sampler.comp.glsl",
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum PoolingStrategy {
-    PreferPooling4,
-    Pooling2Only,
+    Pooling4,
+    Pooling2,
+    SampledPooling4,
+    SampledPooling2,
 }
 
 pub struct Tracker {
@@ -218,18 +234,38 @@ impl Tracker {
         let remaining_divs_by_2 = divs_by_2 - (divs_by_4 * 2);
 
         match pooling_strategy {
-            PoolingStrategy::PreferPooling4 => {
+            PoolingStrategy::Pooling4 => {
                 for _ in 0..divs_by_4 {
-                    input_img = Self::pooling4(device.clone(), queue.clone(), builder, input_img);
+                    input_img =
+                        Self::pooling4(device.clone(), queue.clone(), builder, input_img, false);
                 }
 
                 for _ in 0..remaining_divs_by_2 {
-                    input_img = Self::pooling2(device.clone(), queue.clone(), builder, input_img);
+                    input_img =
+                        Self::pooling2(device.clone(), queue.clone(), builder, input_img, false);
                 }
             }
-            PoolingStrategy::Pooling2Only => {
+            PoolingStrategy::SampledPooling4 => {
+                for _ in 0..divs_by_4 {
+                    input_img =
+                        Self::pooling4(device.clone(), queue.clone(), builder, input_img, true);
+                }
+
+                for _ in 0..remaining_divs_by_2 {
+                    input_img =
+                        Self::pooling2(device.clone(), queue.clone(), builder, input_img, true);
+                }
+            }
+            PoolingStrategy::Pooling2 => {
                 for _ in 0..divs_by_2 {
-                    input_img = Self::pooling2(device.clone(), queue.clone(), builder, input_img);
+                    input_img =
+                        Self::pooling2(device.clone(), queue.clone(), builder, input_img, false);
+                }
+            }
+            PoolingStrategy::SampledPooling2 => {
+                for _ in 0..divs_by_2 {
+                    input_img =
+                        Self::pooling2(device.clone(), queue.clone(), builder, input_img, true);
                 }
             }
         }
@@ -242,13 +278,29 @@ impl Tracker {
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         input_img: Arc<StorageImage>,
+        use_sampler: bool,
     ) -> Arc<StorageImage> {
         let in_size = input_img.dimensions().width();
         let out_size = in_size / 2;
 
         let local_size = [out_size.min(16), out_size.min(16)];
 
-        let pipeline = {
+        let pipeline = if use_sampler {
+            let shader = cs_pool2_sampler::load(device.clone()).unwrap();
+            ComputePipeline::new(
+                device.clone(),
+                shader.entry_point("main").unwrap(),
+                &cs_pool2_sampler::SpecializationConstants {
+                    constant_0: local_size[0],
+                    constant_1: local_size[1],
+                    inv_size: 1.0 / (out_size as f32),
+                    ..Default::default()
+                },
+                None,
+                |_| {},
+            )
+            .unwrap()
+        } else {
             let shader = cs_pool2::load(device.clone()).unwrap();
             ComputePipeline::new(
                 device.clone(),
@@ -276,21 +328,6 @@ impl Tracker {
             },
         );
 
-        let sampler = Sampler::new(
-            device.clone(),
-            Filter::Linear,
-            Filter::Linear,
-            MipmapMode::Nearest,
-            SamplerAddressMode::Repeat,
-            SamplerAddressMode::Repeat,
-            SamplerAddressMode::Repeat,
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-        )
-        .unwrap();
-
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
         let mut set_builder = PersistentDescriptorSet::start(layout.clone());
@@ -298,15 +335,37 @@ impl Tracker {
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
         let output_img_view = ImageView::new(output_img.clone()).unwrap();
 
-        set_builder
-            .add_sampled_image(input_img_view, sampler)
+        if use_sampler {
+            let sampler = Sampler::new(
+                device.clone(),
+                Filter::Linear,
+                Filter::Linear,
+                MipmapMode::Nearest,
+                SamplerAddressMode::Repeat,
+                SamplerAddressMode::Repeat,
+                SamplerAddressMode::Repeat,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+            )
             .unwrap();
+
+            set_builder
+                .add_sampled_image(input_img_view, sampler)
+                .unwrap();
+        } else {
+            set_builder.add_image(input_img_view).unwrap();
+        }
+
         set_builder.add_image(output_img_view).unwrap();
 
         let set = set_builder.build().unwrap();
 
         // let workgroups =  (out_size as f32 / local_size as f32).ceil() as u32;
         let workgroups = utils::workgroups(&output_img.dimensions().width_height(), &local_size);
+
+        dbg!(in_size, out_size, workgroups);
 
         // build command buffer
         builder
@@ -328,13 +387,29 @@ impl Tracker {
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         input_img: Arc<StorageImage>,
+        use_sampler: bool,
     ) -> Arc<StorageImage> {
         let in_size = input_img.dimensions().width();
         let out_size = in_size / 4;
 
         let local_size = [out_size.min(16), out_size.min(16)];
 
-        let pipeline = {
+        let pipeline = if use_sampler {
+            let shader = cs_pool4_sampler::load(device.clone()).unwrap();
+            ComputePipeline::new(
+                device.clone(),
+                shader.entry_point("main").unwrap(),
+                &cs_pool4_sampler::SpecializationConstants {
+                    constant_0: local_size[0],
+                    constant_1: local_size[1],
+                    inv_size: 1.0 / (out_size as f32),
+                    ..Default::default()
+                },
+                None,
+                |_| {},
+            )
+            .unwrap()
+        } else {
             let shader = cs_pool4::load(device.clone()).unwrap();
             ComputePipeline::new(
                 device.clone(),
@@ -362,21 +437,6 @@ impl Tracker {
             },
         );
 
-        let sampler = Sampler::new(
-            device.clone(),
-            Filter::Linear,
-            Filter::Linear,
-            MipmapMode::Nearest,
-            SamplerAddressMode::Repeat,
-            SamplerAddressMode::Repeat,
-            SamplerAddressMode::Repeat,
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-        )
-        .unwrap();
-
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
         let mut set_builder = PersistentDescriptorSet::start(layout.clone());
@@ -384,10 +444,29 @@ impl Tracker {
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
         let output_img_view = ImageView::new(output_img.clone()).unwrap();
 
-        //set_builder.add_image(input_img_view).unwrap();
-        set_builder
-            .add_sampled_image(input_img_view, sampler)
+        if use_sampler {
+            let sampler = Sampler::new(
+                device.clone(),
+                Filter::Linear,
+                Filter::Linear,
+                MipmapMode::Nearest,
+                SamplerAddressMode::Repeat,
+                SamplerAddressMode::Repeat,
+                SamplerAddressMode::Repeat,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+            )
             .unwrap();
+
+            set_builder
+                .add_sampled_image(input_img_view, sampler)
+                .unwrap();
+        } else {
+            set_builder.add_image(input_img_view).unwrap();
+        }
+
         set_builder.add_image(output_img_view).unwrap();
 
         let set = set_builder.build().unwrap();
@@ -413,7 +492,7 @@ impl Tracker {
 
 impl ProcessingElement for Tracker {
     fn build(
-        &mut self,
+        &self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -453,6 +532,7 @@ impl ProcessingElement for Tracker {
         IoElement {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
+            desc: "Tracker".to_string(),
         }
     }
 }
