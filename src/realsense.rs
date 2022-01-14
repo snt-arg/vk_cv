@@ -12,10 +12,17 @@ pub struct Realsense {
     pipe: *mut rs2_pipeline,
     profile: *mut rs2_pipeline_profile,
     dev: *mut rs2_device,
+
+    depth_scale: f32,
 }
 
 impl Realsense {
-    pub fn open() -> Self {
+    pub fn open(
+        color_dimensions: [u32; 2],
+        color_framerate: u32,
+        depth_dimensions: [u32; 2],
+        depth_framerate: u32,
+    ) -> Self {
         unsafe {
             let err = ptr::null_mut();
             let ctx = rs2_create_context(RS2_API_VERSION as i32, err);
@@ -23,24 +30,62 @@ impl Realsense {
             if err != ptr::null_mut() {
                 println!("got an error!");
             }
+
             //let msg = rs2_get_error_message(*err);
 
             let device_list = rs2_query_devices(ctx, err);
             let dev = rs2_create_device(device_list, 0, err);
+            rs2_delete_device_list(device_list);
 
+            // query depth scale
+            let mut depth_scale = 1.0;
+            let sensor_list = rs2_query_sensors(dev, ptr::null_mut());
+            let sensor_count = rs2_get_sensors_count(sensor_list, ptr::null_mut());
+            for i in 0..sensor_count {
+                let sensor = rs2_create_sensor(sensor_list, i, ptr::null_mut());
+
+                // check for depth sensor
+                if rs2_is_sensor_extendable_to(
+                    sensor,
+                    rs2_extension_RS2_EXTENSION_DEPTH_SENSOR,
+                    ptr::null_mut(),
+                ) > 0
+                {
+                    depth_scale = rs2_get_depth_scale(sensor, ptr::null_mut());
+                    rs2_delete_sensor(sensor);
+                    break;
+                }
+
+                rs2_delete_sensor(sensor);
+            }
+            rs2_delete_sensor_list(sensor_list);
+
+            // setup pipeline
             let pipe = rs2_create_pipeline(ctx, ptr::null_mut());
             let config = rs2_create_config(ptr::null_mut());
             rs2_config_enable_stream(
                 config,
                 rs2_stream_RS2_STREAM_COLOR,
                 0,
-                640,
-                480,
+                color_dimensions[0] as i32,
+                color_dimensions[1] as i32,
                 rs2_format_RS2_FORMAT_RGBA8,
-                30,
+                color_framerate as i32,
+                ptr::null_mut(),
+            );
+            rs2_config_enable_stream(
+                config,
+                rs2_stream_RS2_STREAM_DEPTH,
+                0,
+                depth_dimensions[0] as i32,
+                depth_dimensions[1] as i32,
+                rs2_format_RS2_FORMAT_Z16,
+                depth_framerate as i32,
                 ptr::null_mut(),
             );
             let profile = rs2_pipeline_start_with_config(pipe, config, ptr::null_mut());
+
+            //let one_meter = rs2_get_depth_scale(sensor, error)
 
             Realsense {
                 ctx,
@@ -48,12 +93,16 @@ impl Realsense {
                 pipe,
                 profile,
                 dev,
+                depth_scale,
             }
         }
     }
 
-    pub fn fetch_image(&mut self) -> Frame {
+    pub fn fetch_image(&mut self) -> (Frame, Frame) {
         let mut color_frame = Frame {
+            frame: ptr::null_mut(),
+        };
+        let mut depth_frame = Frame {
             frame: ptr::null_mut(),
         };
 
@@ -64,28 +113,40 @@ impl Realsense {
             let frames_count = rs2_embedded_frames_count(composite, err);
 
             for i in 0..frames_count {
-                let frame = rs2_extract_frame(composite, i, err);
+                let frame_ptr = rs2_extract_frame(composite, i, err);
 
-                if err != ptr::null_mut() {
-                    println!("got an error!");
+                // depth frame
+                if rs2_is_frame_extendable_to(
+                    frame_ptr,
+                    rs2_extension_RS2_EXTENSION_DEPTH_FRAME,
+                    err,
+                ) > 0
+                {
+                    depth_frame.frame = frame_ptr;
                 }
 
-                let h = rs2_get_frame_height(frame, ptr::null_mut());
-                let w = rs2_get_frame_width(frame, ptr::null_mut());
-
-                color_frame.frame = frame;
+                // color resp. video frame
+                if rs2_is_frame_extendable_to(
+                    frame_ptr,
+                    rs2_extension_RS2_EXTENSION_VIDEO_FRAME,
+                    err,
+                ) > 0
+                {
+                    color_frame.frame = frame_ptr;
+                }
             }
 
             rs2_release_frame(composite);
         }
 
-        color_frame
+        (color_frame, depth_frame)
     }
 }
 
 impl Drop for Realsense {
     fn drop(&mut self) {
         unsafe {
+            rs2_pipeline_stop(self.pipe, ptr::null_mut());
             rs2_delete_pipeline(self.pipe);
             rs2_delete_pipeline_profile(self.profile);
             rs2_delete_config(self.config);
