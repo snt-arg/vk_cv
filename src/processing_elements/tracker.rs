@@ -11,7 +11,7 @@ use vulkano::{
 
 use crate::utils::{self, ImageInfo};
 
-use super::{Io, IoElement, ProcessingElement};
+use super::{Io, IoFragment, ProcessingElement};
 
 // 0th pass: canvas (power of two)
 mod cs_canvas {
@@ -362,10 +362,8 @@ impl Tracker {
 
         let set = set_builder.build().unwrap();
 
-        // let workgroups =  (out_size as f32 / local_size as f32).ceil() as u32;
+        // workgroups
         let workgroups = utils::workgroups(&output_img.dimensions().width_height(), &local_size);
-
-        dbg!(in_size, out_size, workgroups);
 
         // build command buffer
         builder
@@ -496,8 +494,8 @@ impl ProcessingElement for Tracker {
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &IoElement,
-    ) -> IoElement {
+        input: &IoFragment,
+    ) -> IoFragment {
         // input image
         let input_img = input.output_image().unwrap();
 
@@ -529,7 +527,7 @@ impl ProcessingElement for Tracker {
             self.pooling_strategy,
         );
 
-        IoElement {
+        IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
             desc: "Tracker".to_string(),

@@ -1,11 +1,11 @@
-use crate::processing_elements::IoElement;
+use crate::processing_elements::IoFragment;
 
 pub struct ImageUpload {
-    io: IoElement,
+    io: IoFragment,
 }
 
 impl ImageUpload {
-    pub fn new(io: IoElement) -> Self {
+    pub fn new(io: IoFragment) -> Self {
         Self { io }
     }
 

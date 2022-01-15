@@ -9,7 +9,7 @@ use vkcv::{
         tracker::{PoolingStrategy, Tracker},
     },
     realsense::Realsense,
-    utils::cv_pipeline,
+    utils::{cv_pipeline, cv_pipeline_debug},
     vk_init,
 };
 
@@ -35,40 +35,45 @@ fn main() -> Result<()> {
     std::env::set_var("DISPLAY", ":0");
     std::env::set_var("V3D_DEBUG", "perf");
 
-    let mut realsense = Realsense::open();
+    // depth resolutions
+    // 640x480
+    // 480x270
+    let mut realsense = Realsense::open([640, 480], 30, [640, 480], 30);
 
     // grab a couple of frames
     for _ in 0..5 {
         realsense.fetch_image();
     }
 
-    let img_info = realsense.fetch_image().image_info();
+    let img_info = realsense.fetch_image().0.image_info();
 
     // init device
     let (device, mut queues) = vk_init::init();
     let queue = queues.next().unwrap();
 
     // create a color tracking pipeline
-    let mut pe_input = Input::new(img_info);
-    let mut pe_hsv = Hsvconv::new();
-    let mut pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
-    let mut pe_erode = Morphology::new(Operation::Erode);
-    let mut pe_dilate = Morphology::new(Operation::Dilate);
-    let mut pe_tracker = Tracker::new(PoolingStrategy::PreferPooling4, false);
-    let mut pe_out = Output::new();
+    let pe_input = Input::new(img_info);
+    let pe_hsv = Hsvconv::new();
+    let pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
+    let pe_erode = Morphology::new(Operation::Erode);
+    let pe_dilate = Morphology::new(Operation::Dilate);
+    let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, false);
+    let pe_out = Output::new();
 
     let (pipeline_cb, input_io, output_io) = cv_pipeline(
         device.clone(),
         queue.clone(),
-        &mut pe_input,
-        &mut [
-            &mut pe_hsv,
-            &mut pe_hsv_filter,
-            &mut pe_erode,
-            &mut pe_dilate,
-            &mut pe_tracker,
-        ],
-        &mut pe_out,
+        &pe_input,
+        &[&pe_hsv, &pe_hsv_filter, &pe_erode, &pe_dilate, &pe_tracker],
+        &pe_out,
+    );
+
+    let pipeline_dbg = cv_pipeline_debug(
+        device.clone(),
+        queue.clone(),
+        &pe_input,
+        &[&pe_hsv, &pe_hsv_filter, &pe_erode, &pe_dilate, &pe_tracker],
+        &pe_out,
     );
 
     let upload = ImageUpload::new(input_io);
@@ -107,13 +112,15 @@ fn main() -> Result<()> {
         avg_pipeline_execution_duration.as_millis()
     );
 
+    let mut frame = 0;
+
     loop {
-        let image = realsense.fetch_image();
+        let (color_image, _depth_image) = realsense.fetch_image();
         // println!("{} x {}", image.width(), image.height());
         let pipeline_started = std::time::Instant::now();
 
         // upload image to GPU
-        upload.copy_input_data(image.data_slice());
+        upload.copy_input_data(color_image.data_slice());
 
         // process on GPU
         let future = sync::now(device.clone())
@@ -122,7 +129,7 @@ fn main() -> Result<()> {
             .then_signal_fence_and_flush()
             .unwrap();
 
-        // wait till finished
+        // // wait till finished
         std::thread::sleep(avg_pipeline_execution_duration);
         future.wait(None).unwrap();
 
@@ -134,7 +141,19 @@ fn main() -> Result<()> {
             c[0],
             c[1]
         );
-    }
+        // download.save_output_buffer("camera.png");
+        // println!("Saved!");
 
-    Ok(())
+        if frame % 30 == 0 {
+            // upload.copy_input_data(color_image.data_slice());
+            // pipeline_dbg.dispatch(device.clone(), queue.clone());
+            pipeline_dbg.time(device.clone(), queue.clone());
+            // pipeline_dbg.save_all("debug");
+
+            // std::thread::sleep_ms(5000);
+            // color_image.save("camera.png");
+        }
+
+        frame += 1;
+    }
 }

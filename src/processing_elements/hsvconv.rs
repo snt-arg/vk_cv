@@ -9,7 +9,7 @@ use vulkano::{
 
 use crate::utils::{self};
 
-use super::{Io, IoElement, ProcessingElement};
+use super::{Io, IoFragment, ProcessingElement};
 
 mod cs {
     vulkano_shaders::shader! {
@@ -28,12 +28,12 @@ impl Hsvconv {
 
 impl ProcessingElement for Hsvconv {
     fn build(
-        &mut self,
+        &self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &IoElement,
-    ) -> IoElement {
+        input: &IoFragment,
+    ) -> IoFragment {
         let pipeline = {
             let shader = cs::load(device.clone()).unwrap();
             ComputePipeline::new(
@@ -80,9 +80,10 @@ impl ProcessingElement for Hsvconv {
             ))
             .unwrap();
 
-        IoElement {
+        IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
+            desc: "HSV conversion".to_string(),
         }
     }
 }

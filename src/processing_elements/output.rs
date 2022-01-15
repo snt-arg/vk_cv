@@ -6,7 +6,7 @@ use vulkano::{
     image::ImageAccess,
 };
 
-use super::{Io, IoElement, PipeOutput, ProcessingElement};
+use super::{Io, IoFragment, PipeOutput, ProcessingElement};
 
 pub struct Output {}
 
@@ -18,12 +18,12 @@ impl Output {
 
 impl ProcessingElement for Output {
     fn build(
-        &mut self,
+        &self,
         device: Arc<Device>,
         _queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &IoElement,
-    ) -> IoElement {
+        input: &IoFragment,
+    ) -> IoFragment {
         // input image
         let input_img = input.output_image().unwrap();
 
@@ -46,9 +46,10 @@ impl ProcessingElement for Output {
             .copy_image_to_buffer(input_img.clone(), output_buffer.clone())
             .unwrap();
 
-        IoElement {
+        IoFragment {
             input: Io::Image(input_img),
             output: Io::Buffer(output_buffer),
+            desc: "Output".to_string(),
         }
     }
 }

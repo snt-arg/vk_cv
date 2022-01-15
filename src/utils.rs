@@ -5,8 +5,11 @@ use vulkano::command_buffer::PrimaryAutoCommandBuffer;
 use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
 use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
+use vulkano::sync::{self, GpuFuture};
 
-use crate::processing_elements::{IoElement, PipeInput, PipeOutput, ProcessingElement};
+use crate::endpoints::image_download::ImageDownload;
+use crate::processing_elements::output::Output;
+use crate::processing_elements::{IoFragment, PipeInput, PipeOutput, ProcessingElement};
 
 pub struct ImageInfo {
     pub width: u32,
@@ -51,6 +54,15 @@ pub fn load_image(image_path: &str) -> (ImageInfo, Vec<u8>) {
         image_path, oi.width, oi.height, oi.color_type, oi.bit_depth
     );
 
+    let (ct, _depth) = reader.output_color_type();
+
+    // currently we only support RGBA images since RGB images cannot be
+    // optimally represented by the raspberry
+    match ct {
+        png::ColorType::Rgba => (),
+        _ => panic!("RGBA format required!"),
+    }
+
     (
         ImageInfo {
             width: oi.width,
@@ -71,20 +83,10 @@ pub fn write_image(image_path: &str, data: &[u8], img_info: ImageInfo) {
     match img_info.format {
         Format::R8G8B8A8_UNORM => encoder.set_color(png::ColorType::Rgba),
         Format::R8_UNORM => encoder.set_color(png::ColorType::Grayscale),
-        Format::R32G32B32A32_SFLOAT => {
-            dbg!(data);
-            let x = f32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-            dbg!(x);
-            let y = f32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-            dbg!(y);
-            let z = f32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-            dbg!(z);
-
-            dbg!(x / z, y / z);
-
+        format => {
+            println!("Cannot save format {:?}", format.type_color());
             return;
         }
-        _ => unimplemented!(),
     }
 
     encoder.set_depth(png::BitDepth::Eight);
@@ -132,10 +134,10 @@ pub fn workgroups(dimensions: &[u32; 2], local_size: &[u32; 2]) -> [u32; 3] {
 pub fn cv_pipeline<I, O>(
     device: Arc<Device>,
     queue: Arc<Queue>,
-    input: &mut I,
-    elements: &mut [&mut dyn ProcessingElement],
-    output: &mut O,
-) -> (Arc<PrimaryAutoCommandBuffer>, IoElement, IoElement)
+    input: &I,
+    elements: &[&dyn ProcessingElement],
+    output: &O,
+) -> (Arc<PrimaryAutoCommandBuffer>, IoFragment, IoFragment)
 where
     I: PipeInput + ProcessingElement,
     O: PipeOutput + ProcessingElement,
@@ -147,7 +149,7 @@ where
     )
     .unwrap();
 
-    let dummy = IoElement::dummy();
+    let dummy = IoFragment::none();
     let input_io = input.build(device.clone(), queue.clone(), &mut builder, &dummy);
 
     let mut io_elements = vec![input_io.clone()];
@@ -170,4 +172,137 @@ where
 
     let command_buffer = Arc::new(builder.build().unwrap());
     (command_buffer, input_io, output_io)
+}
+
+pub fn cv_pipeline_debug<I, O>(
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    input: &I,
+    elements: &[&dyn ProcessingElement],
+    output: &O,
+) -> DebugPipeline
+where
+    I: PipeInput + ProcessingElement,
+    O: PipeOutput + ProcessingElement,
+{
+    let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
+        device.clone(),
+        queue.family(),
+        vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
+    )
+    .unwrap();
+
+    let dummy = IoFragment::none();
+    let input_io = input.build(device.clone(), queue.clone(), &mut builder, &dummy);
+
+    let mut io_elements = vec![input_io.clone()];
+
+    for pe in elements {
+        io_elements.push(pe.build(
+            device.clone(),
+            queue.clone(),
+            &mut builder,
+            io_elements.last().as_ref().unwrap(),
+        ));
+    }
+
+    // create generic outputs for each io element in the pipeline
+    let generic_output = Output::new();
+    let generic_output_ios: Vec<_> = io_elements
+        .iter()
+        .map(|io| generic_output.build(device.clone(), queue.clone(), &mut builder, io))
+        .collect();
+
+    // create individual command buffers
+    let mut indiv_io_elements = vec![input_io.clone()];
+    let mut stage_descs = vec![];
+    let mut individual_cbs = vec![];
+    for pe in elements {
+        let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
+            device.clone(),
+            queue.family(),
+            vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
+        )
+        .unwrap();
+
+        let io = pe.build(
+            device.clone(),
+            queue.clone(),
+            &mut builder,
+            indiv_io_elements.last().as_ref().unwrap(),
+        );
+        stage_descs.push(io.desc().to_string());
+
+        indiv_io_elements.push(io);
+        individual_cbs.push(Arc::new(builder.build().unwrap()));
+    }
+
+    let output_io = output.build(
+        device.clone(),
+        queue.clone(),
+        &mut builder,
+        io_elements.last().as_ref().unwrap(),
+    );
+
+    let command_buffer = Arc::new(builder.build().unwrap());
+
+    DebugPipeline {
+        cb: command_buffer,
+        input: input_io,
+        output: output_io,
+        debug_outputs: generic_output_ios,
+        individual_cbs,
+        stage_descs,
+    }
+}
+
+pub struct DebugPipeline {
+    pub cb: Arc<PrimaryAutoCommandBuffer>,
+    pub input: IoFragment,
+    pub output: IoFragment,
+    pub debug_outputs: Vec<IoFragment>,
+    pub individual_cbs: Vec<Arc<PrimaryAutoCommandBuffer>>,
+
+    stage_descs: Vec<String>,
+}
+
+impl DebugPipeline {
+    pub fn dispatch(&self, device: Arc<Device>, queue: Arc<Queue>) {
+        let future = sync::now(device.clone())
+            .then_execute(queue.clone(), self.cb.clone())
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap();
+
+        future.wait(None).unwrap();
+    }
+
+    pub fn time(&self, device: Arc<Device>, queue: Arc<Queue>) {
+        for (i, cb) in self.individual_cbs.iter().enumerate() {
+            let future = sync::now(device.clone())
+                .then_execute(queue.clone(), cb.clone())
+                .unwrap()
+                .then_signal_fence_and_flush()
+                .unwrap();
+
+            let started = std::time::Instant::now();
+            future.wait(None).unwrap();
+            let dt = std::time::Instant::now() - started;
+
+            println!(
+                "[{}] '{}' took {} us",
+                i,
+                self.stage_descs[i],
+                dt.as_micros()
+            );
+        }
+    }
+
+    pub fn save_all(&self, dir: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        for (i, io) in self.debug_outputs.iter().enumerate() {
+            let download = ImageDownload::new(io.clone());
+            download.save_output_buffer(&format!("{}/{}.png", dir, i))
+        }
+    }
 }

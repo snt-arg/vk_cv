@@ -9,7 +9,7 @@ use vulkano::{
 
 use crate::utils;
 
-use super::{Io, IoElement, ProcessingElement};
+use super::{Io, IoFragment, ProcessingElement};
 
 mod cs {
     vulkano_shaders::shader! {
@@ -28,12 +28,12 @@ impl Convolution {
 
 impl ProcessingElement for Convolution {
     fn build(
-        &mut self,
+        &self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &IoElement,
-    ) -> IoElement {
+        input: &IoFragment,
+    ) -> IoFragment {
         let local_size = 16;
 
         let pipeline = {
@@ -93,9 +93,10 @@ impl ProcessingElement for Convolution {
             ))
             .unwrap();
 
-        IoElement {
+        IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
+            desc: "Convolution (single pass)".to_string(),
         }
     }
 }

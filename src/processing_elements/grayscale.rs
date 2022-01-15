@@ -10,7 +10,7 @@ use vulkano::{
 
 use crate::utils::{self, ImageInfo};
 
-use super::{Io, IoElement, ProcessingElement};
+use super::{Io, IoFragment, ProcessingElement};
 
 mod cs {
     vulkano_shaders::shader! {
@@ -29,12 +29,12 @@ impl Grayscale {
 
 impl ProcessingElement for Grayscale {
     fn build(
-        &mut self,
+        &self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &IoElement,
-    ) -> IoElement {
+        input: &IoFragment,
+    ) -> IoFragment {
         let pipeline = {
             let shader = cs::load(device.clone()).unwrap();
             ComputePipeline::new(
@@ -84,9 +84,10 @@ impl ProcessingElement for Grayscale {
             ))
             .unwrap();
 
-        IoElement {
+        IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
+            desc: "Grayscale".to_string(),
         }
     }
 }

@@ -18,21 +18,17 @@ use vulkano::{
 
 pub trait ProcessingElement {
     fn build(
-        &mut self,
+        &self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &IoElement,
-    ) -> IoElement;
+        input: &IoFragment,
+    ) -> IoFragment;
 }
 
 // marker trait
 pub trait PipeOutput {}
-pub trait PipeOutputElement: PipeOutput + ProcessingElement {
-    // fn as_pe(&self) -> &dyn ProcessingElement {
-    //     &self
-    // }
-}
+pub trait PipeOutputElement: PipeOutput + ProcessingElement {}
 
 // marker trait
 pub trait PipeInput {}
@@ -46,12 +42,13 @@ pub enum Io {
 }
 
 #[derive(Clone)]
-pub struct IoElement {
+pub struct IoFragment {
     input: Io,
     output: Io,
+    desc: String,
 }
 
-impl IoElement {
+impl IoFragment {
     pub fn input_image(&self) -> Option<Arc<StorageImage>> {
         match &self.input {
             Io::Image(img) => Some(img.clone()),
@@ -80,10 +77,15 @@ impl IoElement {
         }
     }
 
-    pub fn dummy() -> Self {
+    pub fn desc(&self) -> &str {
+        &self.desc
+    }
+
+    pub fn none() -> Self {
         Self {
             input: Io::None,
             output: Io::None,
+            desc: "dummy".to_string(),
         }
     }
 }

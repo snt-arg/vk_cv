@@ -15,5 +15,5 @@ void main() {
   float r = imageLoad(inputImage, id).r;
   vec2 d = r * vec2(id) * inv_size;
 
-  imageStore(resultImage, id, vec4(d, r, 0));
+  imageStore(resultImage, id, vec4(d, r, r));
 }

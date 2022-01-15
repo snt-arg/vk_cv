@@ -1,16 +1,16 @@
 use vulkano::image::ImageAccess;
 
 use crate::{
-    processing_elements::IoElement,
+    processing_elements::IoFragment,
     utils::{self, ImageInfo},
 };
 
 pub struct ImageDownload {
-    io: IoElement,
+    io: IoFragment,
 }
 
 impl ImageDownload {
-    pub fn new(io: IoElement) -> Self {
+    pub fn new(io: IoFragment) -> Self {
         Self { io }
     }
 

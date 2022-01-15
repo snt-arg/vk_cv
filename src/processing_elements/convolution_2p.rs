@@ -9,7 +9,7 @@ use vulkano::{
 
 use crate::utils;
 
-use super::{Io, IoElement, ProcessingElement};
+use super::{Io, IoFragment, ProcessingElement};
 
 mod cs {
     vulkano_shaders::shader! {
@@ -28,12 +28,12 @@ impl Convolution2Pass {
 
 impl ProcessingElement for Convolution2Pass {
     fn build(
-        &mut self,
+        &self,
         device: Arc<Device>,
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        input: &IoElement,
-    ) -> IoElement {
+        input: &IoFragment,
+    ) -> IoFragment {
         let local_size = 32;
 
         // shader for the first pass
@@ -147,9 +147,10 @@ impl ProcessingElement for Convolution2Pass {
             ))
             .unwrap();
 
-        IoElement {
+        IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
+            desc: "Convolution (two passes)".to_string(),
         }
     }
 }
