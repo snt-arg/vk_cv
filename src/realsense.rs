@@ -1,9 +1,19 @@
-use std::{ffi::c_void, ptr};
+use std::{ops::Deref, ptr};
 
 use realsense_sys::*;
 use vulkano::format::Format::R8G8B8A8_UNORM;
 
 use crate::utils::ImageInfo;
+
+fn panic_err(err: *const rs2_error) {
+    unsafe {
+        if err != ptr::null() {
+            let msg = rs2_get_error_message(err);
+            let msg_str = std::ffi::CStr::from_ptr(msg);
+            panic!("RS2: error '{}'", msg_str.to_str().unwrap());
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Realsense {
@@ -24,25 +34,25 @@ impl Realsense {
         depth_framerate: u32,
     ) -> Self {
         unsafe {
-            let err = ptr::null_mut();
-            let ctx = rs2_create_context(RS2_API_VERSION as i32, err);
+            let mut err = ptr::null_mut();
+            let ctx = rs2_create_context(RS2_API_VERSION as i32, &mut err);
+            panic_err(err);
 
-            if err != ptr::null_mut() {
-                println!("got an error!");
-            }
-
-            //let msg = rs2_get_error_message(*err);
-
-            let device_list = rs2_query_devices(ctx, err);
-            let dev = rs2_create_device(device_list, 0, err);
+            let device_list = rs2_query_devices(ctx, &mut err);
+            panic_err(err);
+            let dev = rs2_create_device(device_list, 0, &mut err);
+            panic_err(err);
             rs2_delete_device_list(device_list);
 
             // query depth scale
             let mut depth_scale = 1.0;
-            let sensor_list = rs2_query_sensors(dev, ptr::null_mut());
-            let sensor_count = rs2_get_sensors_count(sensor_list, ptr::null_mut());
+            let sensor_list = rs2_query_sensors(dev, &mut err);
+            panic_err(err);
+            let sensor_count = rs2_get_sensors_count(sensor_list, &mut err);
+            panic_err(err);
             for i in 0..sensor_count {
-                let sensor = rs2_create_sensor(sensor_list, i, ptr::null_mut());
+                let sensor = rs2_create_sensor(sensor_list, i, &mut err);
+                panic_err(err);
 
                 // check for depth sensor
                 if rs2_is_sensor_extendable_to(
@@ -51,7 +61,8 @@ impl Realsense {
                     ptr::null_mut(),
                 ) > 0
                 {
-                    depth_scale = rs2_get_depth_scale(sensor, ptr::null_mut());
+                    depth_scale = rs2_get_depth_scale(sensor, &mut err);
+                    panic_err(err);
                     rs2_delete_sensor(sensor);
                     break;
                 }
@@ -61,8 +72,10 @@ impl Realsense {
             rs2_delete_sensor_list(sensor_list);
 
             // setup pipeline
-            let pipe = rs2_create_pipeline(ctx, ptr::null_mut());
-            let config = rs2_create_config(ptr::null_mut());
+            let pipe = rs2_create_pipeline(ctx, &mut err);
+            panic_err(err);
+            let config = rs2_create_config(&mut err);
+            panic_err(err);
             rs2_config_enable_stream(
                 config,
                 rs2_stream_RS2_STREAM_COLOR,
@@ -83,9 +96,8 @@ impl Realsense {
                 depth_framerate as i32,
                 ptr::null_mut(),
             );
-            let profile = rs2_pipeline_start_with_config(pipe, config, ptr::null_mut());
-
-            //let one_meter = rs2_get_depth_scale(sensor, error)
+            let profile = rs2_pipeline_start_with_config(pipe, config, &mut err);
+            panic_err(err);
 
             Realsense {
                 ctx,
@@ -98,7 +110,7 @@ impl Realsense {
         }
     }
 
-    pub fn fetch_image(&mut self) -> (Frame, Frame) {
+    pub fn fetch_image(&mut self) -> (ColorFrame, DepthFrame) {
         let mut color_frame = Frame {
             frame: ptr::null_mut(),
         };
@@ -109,11 +121,14 @@ impl Realsense {
         unsafe {
             let err = ptr::null_mut();
             let composite = rs2_pipeline_wait_for_frames(self.pipe, RS2_DEFAULT_TIMEOUT, err);
+            panic_err(*err);
 
             let frames_count = rs2_embedded_frames_count(composite, err);
+            panic_err(*err);
 
             for i in 0..frames_count {
                 let frame_ptr = rs2_extract_frame(composite, i, err);
+                panic_err(*err);
 
                 // depth frame
                 if rs2_is_frame_extendable_to(
@@ -139,7 +154,15 @@ impl Realsense {
             rs2_release_frame(composite);
         }
 
-        (color_frame, depth_frame)
+        (ColorFrame(color_frame), DepthFrame(depth_frame))
+    }
+
+    pub fn depth_at_pixel(
+        cpx: [u32; 2],
+        color_frame: &ColorFrame,
+        depth_frame: &DepthFrame,
+    ) -> f32 {
+        unimplemented!()
     }
 }
 
@@ -153,6 +176,26 @@ impl Drop for Realsense {
             rs2_delete_device(self.dev);
             rs2_delete_context(self.ctx);
         }
+    }
+}
+
+pub struct DepthFrame(Frame);
+
+impl Deref for DepthFrame {
+    type Target = Frame;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub struct ColorFrame(Frame);
+
+impl Deref for ColorFrame {
+    type Target = Frame;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -190,6 +233,18 @@ impl Frame {
 
     pub fn stride(&self) -> u32 {
         unsafe { rs2_get_frame_stride_in_bytes(self.frame, ptr::null_mut()) as u32 }
+    }
+
+    pub fn save(&self, image_path: &str) {
+        crate::utils::write_image(
+            image_path,
+            self.data_slice(),
+            ImageInfo {
+                width: self.width(),
+                height: self.height(),
+                format: R8G8B8A8_UNORM,
+            },
+        );
     }
 
     pub fn crop(&self, new_width: u32, new_height: u32) -> (ImageInfo, Vec<u8>) {
