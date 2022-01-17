@@ -1,4 +1,4 @@
-use std::{ops::Deref, ptr};
+use std::{ffi::c_void, ops::Deref, ptr};
 
 use realsense_sys::*;
 use vulkano::format::Format::R8G8B8A8_UNORM;
@@ -158,11 +158,69 @@ impl Realsense {
     }
 
     pub fn depth_at_pixel(
-        cpx: [u32; 2],
+        &self,
+        color_px: [f32; 2],
         color_frame: &ColorFrame,
         depth_frame: &DepthFrame,
-    ) -> f32 {
-        unimplemented!()
+    ) -> Option<f32> {
+        unsafe {
+            if !(f32::is_finite(color_px[0]) && f32::is_finite(color_px[1])) {
+                return None;
+            }
+
+            let mut err = ptr::null_mut();
+
+            let color_stream_profile = rs2_get_frame_stream_profile(color_frame.frame, &mut err);
+            panic_err(err);
+
+            let depth_stream_profile = rs2_get_frame_stream_profile(depth_frame.frame, &mut err);
+            panic_err(err);
+
+            let mut video_intrinsics = std::mem::zeroed::<rs2_intrinsics>();
+            rs2_get_video_stream_intrinsics(color_stream_profile, &mut video_intrinsics, &mut err);
+            panic_err(err);
+
+            let mut depth_intrinsics = std::mem::zeroed::<rs2_intrinsics>();
+            rs2_get_video_stream_intrinsics(depth_stream_profile, &mut depth_intrinsics, &mut err);
+            panic_err(err);
+
+            let mut depth2video_extrinsics = std::mem::zeroed::<rs2_extrinsics>();
+            rs2_get_extrinsics(
+                depth_stream_profile,
+                color_stream_profile,
+                &mut depth2video_extrinsics,
+                &mut err,
+            );
+            panic_err(err);
+
+            let mut video2depth_extrinsics = std::mem::zeroed::<rs2_extrinsics>();
+            rs2_get_extrinsics(
+                color_stream_profile,
+                depth_stream_profile,
+                &mut video2depth_extrinsics,
+                &mut err,
+            );
+            panic_err(err);
+
+            let mut depth_pixel = [0.0, 0.0];
+
+            rs2_project_color_pixel_to_depth_pixel(
+                depth_pixel.as_mut_ptr(),
+                depth_frame.data_ptr() as *const u16,
+                self.depth_scale,
+                0.15,
+                12.6,
+                &depth_intrinsics,
+                &video_intrinsics,
+                &video2depth_extrinsics,
+                &depth2video_extrinsics,
+                color_px.as_ptr(),
+            );
+
+            depth_frame
+                .pixel_u16([depth_pixel[0] as u32, depth_pixel[1] as u32])
+                .map(|depth| depth as f32 * self.depth_scale)
+        }
     }
 }
 
@@ -221,6 +279,33 @@ impl Frame {
             let ptr = rs2_get_frame_data(self.frame, ptr::null_mut()) as *const u8;
             std::slice::from_raw_parts(ptr, self.bytes_count() as usize)
         }
+    }
+
+    fn data_ptr(&self) -> *const c_void {
+        unsafe { rs2_get_frame_data(self.frame, ptr::null_mut()) }
+    }
+
+    pub fn pixel_u16(&self, p: [u32; 2]) -> Option<u16> {
+        // this assumes that every pixel is 2bytes (16bits)
+
+        let stride = self.stride();
+        let x = p[0];
+        let y = p[1];
+
+        if x < self.width() && y < self.height() {
+            let b1 = self
+                .data_slice()
+                .get((x * 2 + y * stride) as usize)
+                .unwrap();
+            let b2 = self
+                .data_slice()
+                .get(((x * 2 + y * stride) + 1) as usize)
+                .unwrap();
+            let v = u16::from_ne_bytes([*b1, *b2]);
+            return Some(v);
+        }
+
+        None
     }
 
     pub fn image_info(&self) -> ImageInfo {

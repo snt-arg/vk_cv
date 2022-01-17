@@ -115,7 +115,7 @@ fn main() -> Result<()> {
     let mut frame = 0;
 
     loop {
-        let (color_image, _depth_image) = realsense.fetch_image();
+        let (color_image, depth_image) = realsense.fetch_image();
         // println!("{} x {}", image.width(), image.height());
         let pipeline_started = std::time::Instant::now();
 
@@ -143,6 +143,14 @@ fn main() -> Result<()> {
         );
         // download.save_output_buffer("camera.png");
         // println!("Saved!");
+
+        let pixel_coords = [
+            c[0] * color_image.width() as f32,
+            c[1] * color_image.height() as f32,
+        ];
+        let depth = realsense.depth_at_pixel(pixel_coords, &color_image, &depth_image);
+
+        dbg!(depth);
 
         if frame % 30 == 0 {
             // upload.copy_input_data(color_image.data_slice());
