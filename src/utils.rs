@@ -195,27 +195,27 @@ where
     let dummy = IoFragment::none();
     let input_io = input.build(device.clone(), queue.clone(), &mut builder, &dummy);
 
-    let mut io_elements = vec![input_io.clone()];
+    let mut io_fragments = vec![input_io.clone()];
 
     for pe in elements {
-        io_elements.push(pe.build(
+        io_fragments.push(pe.build(
             device.clone(),
             queue.clone(),
             &mut builder,
-            io_elements.last().as_ref().unwrap(),
+            io_fragments.last().as_ref().unwrap(),
         ));
     }
 
     // create generic outputs for each io element in the pipeline
     let generic_output = Output::new();
-    let generic_output_ios: Vec<_> = io_elements
+    let generic_output_ios: Vec<_> = io_fragments
         .iter()
         .map(|io| generic_output.build(device.clone(), queue.clone(), &mut builder, io))
         .collect();
 
     // create individual command buffers
     let mut indiv_io_elements = vec![input_io.clone()];
-    let mut stage_descs = vec![];
+    let mut stage_labels = vec![];
     let mut individual_cbs = vec![];
     for pe in elements {
         let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
@@ -231,7 +231,7 @@ where
             &mut builder,
             indiv_io_elements.last().as_ref().unwrap(),
         );
-        stage_descs.push(io.label().to_string());
+        stage_labels.push(io.label().to_string());
 
         indiv_io_elements.push(io);
         individual_cbs.push(Arc::new(builder.build().unwrap()));
@@ -241,7 +241,7 @@ where
         device.clone(),
         queue.clone(),
         &mut builder,
-        io_elements.last().as_ref().unwrap(),
+        io_fragments.last().as_ref().unwrap(),
     );
 
     let command_buffer = Arc::new(builder.build().unwrap());
@@ -252,7 +252,7 @@ where
         output: output_io,
         debug_outputs: generic_output_ios,
         individual_cbs,
-        stage_descs,
+        stage_labels,
     }
 }
 
@@ -263,7 +263,7 @@ pub struct DebugPipeline {
     pub debug_outputs: Vec<IoFragment>,
     pub individual_cbs: Vec<Arc<PrimaryAutoCommandBuffer>>,
 
-    stage_descs: Vec<String>,
+    stage_labels: Vec<String>,
 }
 
 impl DebugPipeline {
@@ -292,7 +292,7 @@ impl DebugPipeline {
             println!(
                 "🠶 ({}) '{}' took {} μs",
                 i,
-                self.stage_descs[i],
+                self.stage_labels[i],
                 dt.as_micros()
             );
         }
