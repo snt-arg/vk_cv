@@ -11,7 +11,7 @@ use vkcv::{
         output::Output,
         tracker::{PoolingStrategy, Tracker},
     },
-    utils::{cv_pipeline, cv_pipeline_debug, load_image},
+    utils::{cv_pipeline_sequential, cv_pipeline_sequential_debug, load_image},
     vk_init,
 };
 
@@ -54,7 +54,7 @@ fn main() -> Result<()> {
     let pe_tracker = Tracker::new(PoolingStrategy::SampledPooling4, false);
     let pe_out = Output::new();
 
-    let dp = cv_pipeline_debug(
+    let dp = cv_pipeline_sequential_debug(
         device.clone(),
         queue.clone(),
         &pe_input,
@@ -77,11 +77,10 @@ fn main() -> Result<()> {
     upload.copy_input_data(&img_data);
 
     // process on GPU & wait till finished
-    dp.dispatch(device.clone(), queue.clone());
     dp.time(device.clone(), queue.clone());
 
     // save images
-    dp.save_all("pipeline");
+    dp.save_all(device.clone(), queue.clone(), "out", "pipeline-");
 
     let pipeline_dt = std::time::Instant::now() - pipeline_started;
     println!("Pipeline took {} us", pipeline_dt.as_micros());

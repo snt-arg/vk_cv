@@ -9,7 +9,7 @@ use vkcv::{
         tracker::{PoolingStrategy, Tracker},
     },
     realsense::Realsense,
-    utils::{cv_pipeline, cv_pipeline_debug},
+    utils::{cv_pipeline_sequential, cv_pipeline_sequential_debug},
     vk_init,
 };
 
@@ -60,7 +60,7 @@ fn main() -> Result<()> {
     let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, false);
     let pe_out = Output::new();
 
-    let (pipeline_cb, input_io, output_io) = cv_pipeline(
+    let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(
         device.clone(),
         queue.clone(),
         &pe_input,
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
         &pe_out,
     );
 
-    let pipeline_dbg = cv_pipeline_debug(
+    let pipeline_dbg = cv_pipeline_sequential_debug(
         device.clone(),
         queue.clone(),
         &pe_input,
@@ -112,11 +112,14 @@ fn main() -> Result<()> {
         avg_pipeline_execution_duration.as_millis()
     );
 
+    let start_of_program = std::time::Instant::now();
     let mut frame = 0;
 
     loop {
+        // grab depth and color image from the realsense
         let (color_image, depth_image) = realsense.fetch_image();
-        // println!("{} x {}", image.width(), image.height());
+
+        // time
         let pipeline_started = std::time::Instant::now();
 
         // upload image to GPU
@@ -129,23 +132,25 @@ fn main() -> Result<()> {
             .then_signal_fence_and_flush()
             .unwrap();
 
-        // // wait till finished
+        // wait till finished
         std::thread::sleep(avg_pipeline_execution_duration);
         future.wait(None).unwrap();
 
+        // print results
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
         let (c, area) = download.centroid();
+        let area_px = (area * color_image.area() as f32) as u32;
         println!(
-            "Pipeline flushed: {} ms, coords [{:.2},{:.2}] ({} px²)",
+            "[{}] Pipeline flushed: {} ms, coords [{:.2},{:.2}] ({} px²)",
+            frame,
             pipeline_dt.as_millis(),
             c[0],
             c[1],
-            (area * color_image.width() as f32 * color_image.height() as f32) as u32
+            area_px
         );
-        // download.save_output_buffer("camera.png");
-        // println!("Saved!");
 
-        if area > 5.0 {
+        // get the depth only if our object is bigger than 225px² (15x15)
+        if area_px > 225 {
             let pixel_coords = [
                 c[0] * color_image.width() as f32,
                 c[1] * color_image.height() as f32,
@@ -155,14 +160,22 @@ fn main() -> Result<()> {
             dbg!(depth);
         }
 
+        // debug
+        // break down the cost of the individual stages
         if frame % 30 == 0 {
-            // upload.copy_input_data(color_image.data_slice());
-            // pipeline_dbg.dispatch(device.clone(), queue.clone());
+            // time the execution of the individual stages
             pipeline_dbg.time(device.clone(), queue.clone());
-            // pipeline_dbg.save_all("debug");
 
-            // std::thread::sleep_ms(5000);
-            // color_image.save("camera.png");
+            // save a snapshot of all stages in the pipeline
+            let upload = ImageUpload::new(pipeline_dbg.input.clone());
+            upload.copy_input_data(color_image.data_slice());
+            let prefix = std::time::Instant::now().duration_since(start_of_program);
+            pipeline_dbg.save_all(
+                device.clone(),
+                queue.clone(),
+                "out",
+                &format!("{}-", prefix.as_millis()),
+            );
         }
 
         frame += 1;

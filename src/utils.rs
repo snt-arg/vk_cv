@@ -131,7 +131,7 @@ pub fn workgroups(dimensions: &[u32; 2], local_size: &[u32; 2]) -> [u32; 3] {
     ]
 }
 
-pub fn cv_pipeline<I, O>(
+pub fn cv_pipeline_sequential<I, O>(
     device: Arc<Device>,
     queue: Arc<Queue>,
     input: &I,
@@ -152,14 +152,14 @@ where
     let dummy = IoFragment::none();
     let input_io = input.build(device.clone(), queue.clone(), &mut builder, &dummy);
 
-    let mut io_elements = vec![input_io.clone()];
+    let mut io_fragments = vec![input_io.clone()];
 
     for pe in elements {
-        io_elements.push(pe.build(
+        io_fragments.push(pe.build(
             device.clone(),
             queue.clone(),
             &mut builder,
-            io_elements.last().as_ref().unwrap(),
+            io_fragments.last().as_ref().unwrap(),
         ));
     }
 
@@ -167,14 +167,14 @@ where
         device.clone(),
         queue.clone(),
         &mut builder,
-        io_elements.last().as_ref().unwrap(),
+        io_fragments.last().as_ref().unwrap(),
     );
 
     let command_buffer = Arc::new(builder.build().unwrap());
     (command_buffer, input_io, output_io)
 }
 
-pub fn cv_pipeline_debug<I, O>(
+pub fn cv_pipeline_sequential_debug<I, O>(
     device: Arc<Device>,
     queue: Arc<Queue>,
     input: &I,
@@ -206,12 +206,22 @@ where
         ));
     }
 
+    let output_io = output.build(
+        device.clone(),
+        queue.clone(),
+        &mut builder,
+        io_fragments.last().as_ref().unwrap(),
+    );
+
     // create generic outputs for each io element in the pipeline
     let generic_output = Output::new();
     let generic_output_ios: Vec<_> = io_fragments
         .iter()
         .map(|io| generic_output.build(device.clone(), queue.clone(), &mut builder, io))
         .collect();
+
+    // finalize the command buffer
+    let command_buffer = Arc::new(builder.build().unwrap());
 
     // create individual command buffers
     let mut indiv_io_elements = vec![input_io.clone()];
@@ -236,15 +246,6 @@ where
         indiv_io_elements.push(io);
         individual_cbs.push(Arc::new(builder.build().unwrap()));
     }
-
-    let output_io = output.build(
-        device.clone(),
-        queue.clone(),
-        &mut builder,
-        io_fragments.last().as_ref().unwrap(),
-    );
-
-    let command_buffer = Arc::new(builder.build().unwrap());
 
     DebugPipeline {
         cb: command_buffer,
@@ -298,11 +299,12 @@ impl DebugPipeline {
         }
     }
 
-    pub fn save_all(&self, dir: &str) {
+    pub fn save_all(&self, device: Arc<Device>, queue: Arc<Queue>, dir: &str, prefix: &str) {
+        self.dispatch(device, queue);
         std::fs::create_dir_all(dir).unwrap();
         for (i, io) in self.debug_outputs.iter().enumerate() {
             let download = ImageDownload::new(io.clone());
-            download.save_output_buffer(&format!("{}/{}.png", dir, i))
+            download.save_output_buffer(&format!("{}/{}{}.png", dir, prefix, i))
         }
     }
 }
