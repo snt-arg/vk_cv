@@ -11,6 +11,6 @@ vulkano-shaders = "0.27"
 png = "0.17"
 anyhow = "1"
 
-realsense-sys = "2.47.0"
+realsense-sys = {version="2.47.0", features=["buildtime-bindgen"]}
 # drm = "0.6.1"
 # gbm = "0.7.0"
