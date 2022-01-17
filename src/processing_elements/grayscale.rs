@@ -87,7 +87,7 @@ impl ProcessingElement for Grayscale {
         IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
-            desc: "Grayscale".to_string(),
+            label: "Grayscale".to_string(),
         }
     }
 }

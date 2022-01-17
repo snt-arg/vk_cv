@@ -530,7 +530,7 @@ impl ProcessingElement for Tracker {
         IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
-            desc: "Tracker".to_string(),
+            label: "Tracker".to_string(),
         }
     }
 }

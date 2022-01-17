@@ -28,7 +28,7 @@ impl ImageDownload {
         utils::write_image(filename, &buffer_content, info);
     }
 
-    pub fn centroid(&self) -> [f32; 2] {
+    pub fn centroid(&self) -> ([f32; 2], f32) {
         let buffer = self.io.output_buffer().unwrap();
         let data = buffer.read().unwrap();
 
@@ -41,6 +41,6 @@ impl ImageDownload {
 
         // dbg!(x / z, y / z);
 
-        [x / z, y / z]
+        ([x / z, y / z], z)
     }
 }

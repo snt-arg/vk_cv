@@ -47,7 +47,7 @@ impl ProcessingElement for Input {
         IoFragment {
             input: Io::Buffer(input_buffer),
             output: Io::Image(output_img),
-            desc: "Input".to_string(),
+            label: "Input".to_string(),
         }
     }
 }

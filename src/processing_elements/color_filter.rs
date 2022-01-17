@@ -97,7 +97,7 @@ impl ProcessingElement for ColorFilter {
         IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
-            desc: "ColorFilter".to_string(),
+            label: "ColorFilter".to_string(),
         }
     }
 }

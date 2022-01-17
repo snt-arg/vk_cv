@@ -45,7 +45,7 @@ pub enum Io {
 pub struct IoFragment {
     input: Io,
     output: Io,
-    desc: String,
+    label: String,
 }
 
 impl IoFragment {
@@ -77,15 +77,15 @@ impl IoFragment {
         }
     }
 
-    pub fn desc(&self) -> &str {
-        &self.desc
+    pub fn label(&self) -> &str {
+        &self.label
     }
 
     pub fn none() -> Self {
         Self {
             input: Io::None,
             output: Io::None,
-            desc: "dummy".to_string(),
+            label: "dummy".to_string(),
         }
     }
 }

@@ -134,23 +134,26 @@ fn main() -> Result<()> {
         future.wait(None).unwrap();
 
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
-        let c = download.centroid();
+        let (c, area) = download.centroid();
         println!(
-            "Pipeline flushed: {} ms, coords ({},{})",
+            "Pipeline flushed: {} ms, coords [{:.2},{:.2}] ({} px²)",
             pipeline_dt.as_millis(),
             c[0],
-            c[1]
+            c[1],
+            (area * color_image.width() as f32 * color_image.height() as f32) as u32
         );
         // download.save_output_buffer("camera.png");
         // println!("Saved!");
 
-        let pixel_coords = [
-            c[0] * color_image.width() as f32,
-            c[1] * color_image.height() as f32,
-        ];
-        let depth = realsense.depth_at_pixel(pixel_coords, &color_image, &depth_image);
+        if area > 5.0 {
+            let pixel_coords = [
+                c[0] * color_image.width() as f32,
+                c[1] * color_image.height() as f32,
+            ];
+            let depth = realsense.depth_at_pixel(pixel_coords, &color_image, &depth_image);
 
-        dbg!(depth);
+            dbg!(depth);
+        }
 
         if frame % 30 == 0 {
             // upload.copy_input_data(color_image.data_slice());

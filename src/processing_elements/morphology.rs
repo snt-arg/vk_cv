@@ -107,7 +107,7 @@ impl ProcessingElement for Morphology {
         IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img),
-            desc: "Morphology".to_string(),
+            label: "Morphology".to_string(),
         }
     }
 }

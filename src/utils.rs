@@ -231,7 +231,7 @@ where
             &mut builder,
             indiv_io_elements.last().as_ref().unwrap(),
         );
-        stage_descs.push(io.desc().to_string());
+        stage_descs.push(io.label().to_string());
 
         indiv_io_elements.push(io);
         individual_cbs.push(Arc::new(builder.build().unwrap()));
@@ -290,7 +290,7 @@ impl DebugPipeline {
             let dt = std::time::Instant::now() - started;
 
             println!(
-                "[{}] '{}' took {} us",
+                "🠶 ({}) '{}' took {} μs",
                 i,
                 self.stage_descs[i],
                 dt.as_micros()

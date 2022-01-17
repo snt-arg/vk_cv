@@ -49,7 +49,7 @@ impl ProcessingElement for Output {
         IoFragment {
             input: Io::Image(input_img),
             output: Io::Buffer(output_buffer),
-            desc: "Output".to_string(),
+            label: "Output".to_string(),
         }
     }
 }
