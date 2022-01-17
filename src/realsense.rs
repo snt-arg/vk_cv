@@ -119,22 +119,22 @@ impl Realsense {
         };
 
         unsafe {
-            let err = ptr::null_mut();
-            let composite = rs2_pipeline_wait_for_frames(self.pipe, RS2_DEFAULT_TIMEOUT, err);
-            panic_err(*err);
+            let mut err = ptr::null_mut();
+            let composite = rs2_pipeline_wait_for_frames(self.pipe, RS2_DEFAULT_TIMEOUT, &mut err);
+            panic_err(err);
 
-            let frames_count = rs2_embedded_frames_count(composite, err);
-            panic_err(*err);
+            let frames_count = rs2_embedded_frames_count(composite, &mut err);
+            panic_err(err);
 
             for i in 0..frames_count {
-                let frame_ptr = rs2_extract_frame(composite, i, err);
-                panic_err(*err);
+                let frame_ptr = rs2_extract_frame(composite, i, &mut err);
+                panic_err(err);
 
                 // depth frame
                 if rs2_is_frame_extendable_to(
                     frame_ptr,
                     rs2_extension_RS2_EXTENSION_DEPTH_FRAME,
-                    err,
+                    &mut err,
                 ) > 0
                 {
                     depth_frame.frame = frame_ptr;
@@ -144,7 +144,7 @@ impl Realsense {
                 if rs2_is_frame_extendable_to(
                     frame_ptr,
                     rs2_extension_RS2_EXTENSION_VIDEO_FRAME,
-                    err,
+                    &mut err,
                 ) > 0
                 {
                     color_frame.frame = frame_ptr;
@@ -218,7 +218,7 @@ impl Realsense {
             );
 
             depth_frame
-                .pixel_u16([depth_pixel[0] as u32, depth_pixel[1] as u32])
+                .pixel_as_u16([depth_pixel[0] as u32, depth_pixel[1] as u32])
                 .map(|depth| depth as f32 * self.depth_scale)
         }
     }
@@ -285,8 +285,9 @@ impl Frame {
         unsafe { rs2_get_frame_data(self.frame, ptr::null_mut()) }
     }
 
-    pub fn pixel_u16(&self, p: [u32; 2]) -> Option<u16> {
+    pub fn pixel_as_u16(&self, p: [u32; 2]) -> Option<u16> {
         // this assumes that every pixel is 2bytes (16bits)
+        // depth image (typically)
 
         let stride = self.stride();
         let x = p[0];
@@ -306,6 +307,10 @@ impl Frame {
         }
 
         None
+    }
+
+    pub fn area(&self) -> u32 {
+        self.width() * self.height()
     }
 
     pub fn image_info(&self) -> ImageInfo {
