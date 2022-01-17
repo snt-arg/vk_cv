@@ -11,7 +11,6 @@ use vkcv::{
         output::Output,
         tracker::{PoolingStrategy, Tracker},
     },
-    realsense::Realsense,
     utils::{cv_pipeline, cv_pipeline_debug, load_image},
     vk_init,
 };
