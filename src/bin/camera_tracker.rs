@@ -6,7 +6,7 @@ use vkcv::{
         input::Input,
         morphology::{Morphology, Operation},
         output::Output,
-        tracker::{PoolingStrategy, Tracker},
+        tracker::{Canvas, Pooling, Tracker},
     },
     realsense::Realsense,
     utils::{cv_pipeline_sequential, cv_pipeline_sequential_debug},
@@ -59,7 +59,7 @@ fn main() -> Result<()> {
     let pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, false);
+    let pe_tracker = Tracker::new(Pooling::Pooling4, Canvas::Pad);
     let pe_out = Output::new();
 
     let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(

@@ -60,24 +60,27 @@ mod cs_pool4_sampler {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum PoolingStrategy {
+pub enum Pooling {
     Pooling4,
     Pooling2,
     SampledPooling4,
     SampledPooling2,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum Canvas {
+    Pad,
+    Crop,
+}
+
 pub struct Tracker {
-    pooling_strategy: PoolingStrategy,
-    crop: bool,
+    pooling: Pooling,
+    canvas: Canvas,
 }
 
 impl Tracker {
-    pub fn new(pooling_strategy: PoolingStrategy, crop: bool) -> Self {
-        Self {
-            pooling_strategy,
-            crop,
-        }
+    pub fn new(pooling: Pooling, canvas: Canvas) -> Self {
+        Self { pooling, canvas }
     }
 
     fn canvas(
@@ -85,7 +88,7 @@ impl Tracker {
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         input_img: Arc<StorageImage>,
-        crop: bool,
+        canvas: Canvas,
     ) -> Arc<StorageImage> {
         let pipeline = {
             let shader = cs_canvas::load(device.clone()).unwrap();
@@ -107,10 +110,9 @@ impl Tracker {
             .width()
             .max(input_img.dimensions().height());
 
-        let pot = if crop {
-            2u32.pow((stride as f32).log2().floor() as u32)
-        } else {
-            2u32.pow((stride as f32).log2().ceil() as u32)
+        let pot = match canvas {
+            Canvas::Crop => 2u32.pow((stride as f32).log2().floor() as u32),
+            Canvas::Pad => 2u32.pow((stride as f32).log2().ceil() as u32),
         };
 
         // skip this pass if image is already power of two
@@ -224,7 +226,7 @@ impl Tracker {
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         mut input_img: Arc<StorageImage>,
-        pooling_strategy: PoolingStrategy,
+        pooling_strategy: Pooling,
     ) -> Arc<StorageImage> {
         let size = input_img.dimensions().width_height();
         assert_eq!(size[0], size[1]);
@@ -234,7 +236,7 @@ impl Tracker {
         let remaining_divs_by_2 = divs_by_2 - (divs_by_4 * 2);
 
         match pooling_strategy {
-            PoolingStrategy::Pooling4 => {
+            Pooling::Pooling4 => {
                 for _ in 0..divs_by_4 {
                     input_img =
                         Self::pooling4(device.clone(), queue.clone(), builder, input_img, false);
@@ -245,7 +247,7 @@ impl Tracker {
                         Self::pooling2(device.clone(), queue.clone(), builder, input_img, false);
                 }
             }
-            PoolingStrategy::SampledPooling4 => {
+            Pooling::SampledPooling4 => {
                 for _ in 0..divs_by_4 {
                     input_img =
                         Self::pooling4(device.clone(), queue.clone(), builder, input_img, true);
@@ -256,13 +258,13 @@ impl Tracker {
                         Self::pooling2(device.clone(), queue.clone(), builder, input_img, true);
                 }
             }
-            PoolingStrategy::Pooling2 => {
+            Pooling::Pooling2 => {
                 for _ in 0..divs_by_2 {
                     input_img =
                         Self::pooling2(device.clone(), queue.clone(), builder, input_img, false);
                 }
             }
-            PoolingStrategy::SampledPooling2 => {
+            Pooling::SampledPooling2 => {
                 for _ in 0..divs_by_2 {
                     input_img =
                         Self::pooling2(device.clone(), queue.clone(), builder, input_img, true);
@@ -506,7 +508,7 @@ impl ProcessingElement for Tracker {
             queue.clone(),
             builder,
             input_img.clone(),
-            self.crop,
+            self.canvas,
         );
 
         // coordinate mask
@@ -519,13 +521,7 @@ impl ProcessingElement for Tracker {
         );
 
         // scale down to 1x1 px
-        let output_img = Self::pooling(
-            device,
-            queue,
-            builder,
-            output_img.clone(),
-            self.pooling_strategy,
-        );
+        let output_img = Self::pooling(device, queue, builder, output_img.clone(), self.pooling);
 
         IoFragment {
             input: Io::Image(input_img),

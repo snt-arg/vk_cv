@@ -9,7 +9,7 @@ use vkcv::{
         input::Input,
         morphology::{Morphology, Operation},
         output::Output,
-        tracker::{PoolingStrategy, Tracker},
+        tracker::{Canvas, Pooling, Tracker},
     },
     utils::{cv_pipeline_sequential, cv_pipeline_sequential_debug, load_image},
     vk_init,
@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_tracker = Tracker::new(PoolingStrategy::SampledPooling4, false);
+    let pe_tracker = Tracker::new(Pooling::SampledPooling4, Canvas::Pad);
     let pe_out = Output::new();
 
     let dp = cv_pipeline_sequential_debug(
