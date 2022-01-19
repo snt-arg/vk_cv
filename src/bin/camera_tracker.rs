@@ -16,6 +16,8 @@ use vkcv::{
 use anyhow::Result;
 use vulkano::sync::{self, GpuFuture};
 
+const DBG_PROFILE: bool = true;
+
 fn main() -> Result<()> {
     // v3d specs/properties:
     //
@@ -38,14 +40,14 @@ fn main() -> Result<()> {
     // depth resolutions
     // 640x480
     // 480x270
-    let mut realsense = Realsense::open([640, 480], 30, [640, 480], 30);
+    let mut camera = Realsense::open([640, 480], 30, [640, 480], 30);
 
     // grab a couple of frames
     for _ in 0..5 {
-        realsense.fetch_image();
+        camera.fetch_image();
     }
 
-    let img_info = realsense.fetch_image().0.image_info();
+    let img_info = camera.fetch_image().0.image_info();
 
     // init device
     let (device, mut queues) = vk_init::init();
@@ -117,7 +119,7 @@ fn main() -> Result<()> {
 
     loop {
         // grab depth and color image from the realsense
-        let (color_image, depth_image) = realsense.fetch_image();
+        let (color_image, depth_image) = camera.fetch_image();
 
         // time
         let pipeline_started = std::time::Instant::now();
@@ -140,14 +142,17 @@ fn main() -> Result<()> {
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
         let (c, area) = download.centroid();
         let area_px = (area * color_image.area() as f32) as u32;
-        println!(
-            "[{}] Pipeline flushed: {} ms, coords [{:.2},{:.2}] ({} px²)",
-            frame,
-            pipeline_dt.as_millis(),
-            c[0],
-            c[1],
-            area_px
-        );
+
+        if DBG_PROFILE {
+            println!(
+                "[{}] Pipeline flushed: {} ms, coords [{:.2},{:.2}] ({} px²)",
+                frame,
+                pipeline_dt.as_millis(),
+                c[0],
+                c[1],
+                area_px
+            );
+        }
 
         // get the depth only if our object is bigger than 225px² (15x15)
         if area_px > 225 {
@@ -155,14 +160,18 @@ fn main() -> Result<()> {
                 c[0] * color_image.width() as f32,
                 c[1] * color_image.height() as f32,
             ];
-            let depth = realsense.depth_at_pixel(pixel_coords, &color_image, &depth_image);
+            let depth = camera.depth_at_pixel(&pixel_coords, &color_image, &depth_image);
 
-            dbg!(depth);
+            // de-project to obtain a 3D point in camera coordinates
+            if let Some(depth) = depth {
+                let point = camera.deproject_pixel(&pixel_coords, depth, &color_image);
+                dbg!(point);
+            }
         }
 
         // debug
         // break down the cost of the individual stages
-        if frame % 30 == 0 {
+        if DBG_PROFILE && frame % 30 == 0 {
             // time the execution of the individual stages
             pipeline_dbg.time(device.clone(), queue.clone());
 

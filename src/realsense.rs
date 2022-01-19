@@ -159,7 +159,7 @@ impl Realsense {
 
     pub fn depth_at_pixel(
         &self,
-        color_px: [f32; 2],
+        color_px: &[f32; 2],
         color_frame: &ColorFrame,
         depth_frame: &DepthFrame,
     ) -> Option<f32> {
@@ -220,6 +220,34 @@ impl Realsense {
             depth_frame
                 .pixel_as_u16([depth_pixel[0] as u32, depth_pixel[1] as u32])
                 .map(|depth| depth as f32 * self.depth_scale)
+        }
+    }
+
+    pub fn deproject_pixel(
+        &self,
+        color_px: &[f32; 2],
+        depth: f32,
+        color_frame: &ColorFrame,
+    ) -> [f32; 3] {
+        unsafe {
+            let mut err = ptr::null_mut();
+
+            let color_stream_profile = rs2_get_frame_stream_profile(color_frame.frame, &mut err);
+            panic_err(err);
+
+            let mut video_intrinsics = std::mem::zeroed::<rs2_intrinsics>();
+            rs2_get_video_stream_intrinsics(color_stream_profile, &mut video_intrinsics, &mut err);
+            panic_err(err);
+
+            let mut point = [0.0, 0.0, 0.0];
+            rs2_deproject_pixel_to_point(
+                point.as_mut_ptr(),
+                &video_intrinsics,
+                color_px.as_ptr(),
+                depth,
+            );
+
+            point
         }
     }
 }
