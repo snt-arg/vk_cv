@@ -28,9 +28,9 @@ pub struct Realsense {
 
 impl Realsense {
     pub fn open(
-        color_dimensions: [u32; 2],
+        color_dimensions: &[u32; 2],
         color_framerate: u32,
-        depth_dimensions: [u32; 2],
+        depth_dimensions: &[u32; 2],
         depth_framerate: u32,
     ) -> Self {
         unsafe {

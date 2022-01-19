@@ -66,8 +66,8 @@ fn main() -> Result<()> {
         &pe_out,
     );
 
-    let upload = ImageUpload::new(dp.input.clone());
-    let download = ImageDownload::new(dp.output.clone());
+    let upload = ImageUpload::from_io(dp.input.clone()).unwrap();
+    let download = ImageDownload::from_io(dp.output.clone()).unwrap();
 
     // let color_image = realsense.fetch_image();
     //println!("{} x {}", color_image.width(), color_image.height());

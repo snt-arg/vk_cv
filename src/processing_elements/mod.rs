@@ -43,9 +43,9 @@ pub enum Io {
 
 #[derive(Clone)]
 pub struct IoFragment {
-    input: Io,
-    output: Io,
-    label: String,
+    pub input: Io,
+    pub output: Io,
+    pub label: String,
 }
 
 impl IoFragment {
@@ -75,10 +75,6 @@ impl IoFragment {
             Io::Buffer(buf) => Some(buf.clone()),
             _ => None,
         }
-    }
-
-    pub fn label(&self) -> &str {
-        &self.label
     }
 
     pub fn none() -> Self {

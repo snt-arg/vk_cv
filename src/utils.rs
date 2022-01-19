@@ -241,7 +241,7 @@ where
             &mut builder,
             indiv_io_elements.last().as_ref().unwrap(),
         );
-        stage_labels.push(io.label().to_string());
+        stage_labels.push(io.label.to_string());
 
         indiv_io_elements.push(io);
         individual_cbs.push(Arc::new(builder.build().unwrap()));
@@ -303,7 +303,7 @@ impl DebugPipeline {
         self.dispatch(device, queue);
         std::fs::create_dir_all(dir).unwrap();
         for (i, io) in self.debug_outputs.iter().enumerate() {
-            let download = ImageDownload::new(io.clone());
+            let download = ImageDownload::from_io(io.clone()).unwrap();
             download.save_output_buffer(&format!("{}/{}{}.png", dir, prefix, i))
         }
     }

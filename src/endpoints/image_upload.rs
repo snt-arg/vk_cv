@@ -1,12 +1,15 @@
-use crate::processing_elements::IoFragment;
+use crate::processing_elements::{Io, IoFragment};
 
 pub struct ImageUpload {
     io: IoFragment,
 }
 
 impl ImageUpload {
-    pub fn new(io: IoFragment) -> Self {
-        Self { io }
+    pub fn from_io(io: IoFragment) -> Result<Self, &'static str> {
+        match &io.input {
+            Io::Buffer(_) => Ok(Self { io }),
+            _ => Err("Input needs to be a buffer"),
+        }
     }
 
     pub fn copy_input_data(&self, data: &[u8]) {

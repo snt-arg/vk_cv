@@ -40,7 +40,7 @@ fn main() -> Result<()> {
     // depth resolutions
     // 640x480
     // 480x270
-    let mut camera = Realsense::open([640, 480], 30, [640, 480], 30);
+    let mut camera = Realsense::open(&[640, 480], 30, &[640, 480], 30);
 
     // grab a couple of frames
     for _ in 0..5 {
@@ -78,8 +78,8 @@ fn main() -> Result<()> {
         &pe_out,
     );
 
-    let upload = ImageUpload::new(input_io);
-    let download = ImageDownload::new(output_io);
+    let upload = ImageUpload::from_io(input_io).unwrap();
+    let download = ImageDownload::from_io(output_io).unwrap();
 
     let mut avg_pipeline_execution_duration = std::time::Duration::ZERO;
 
@@ -176,7 +176,7 @@ fn main() -> Result<()> {
             pipeline_dbg.time(device.clone(), queue.clone());
 
             // save a snapshot of all stages in the pipeline
-            let upload = ImageUpload::new(pipeline_dbg.input.clone());
+            let upload = ImageUpload::from_io(pipeline_dbg.input.clone()).unwrap();
             upload.copy_input_data(color_image.data_slice());
             let prefix = std::time::Instant::now().duration_since(start_of_program);
             pipeline_dbg.save_all(

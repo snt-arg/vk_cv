@@ -1,7 +1,7 @@
 use vulkano::image::ImageAccess;
 
 use crate::{
-    processing_elements::IoFragment,
+    processing_elements::{Io, IoFragment},
     utils::{self, ImageInfo},
 };
 
@@ -10,8 +10,11 @@ pub struct ImageDownload {
 }
 
 impl ImageDownload {
-    pub fn new(io: IoFragment) -> Self {
-        Self { io }
+    pub fn from_io(io: IoFragment) -> Result<Self, &'static str> {
+        match &io.output {
+            Io::Buffer(_) => Ok(Self { io }),
+            _ => Err("Output needs to be a buffer"),
+        }
     }
 
     pub fn save_output_buffer(&self, filename: &str) {
