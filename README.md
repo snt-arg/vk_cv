@@ -14,7 +14,7 @@ The pipeline consists of the following stages:
 
 ![Alt text](media/pipeline.png?raw=true "Pipeline")
 
-## Results
+## Performance
 
 On the Raspberry Pi4, the Vulkan accelerated pipeline is about 2x faster and takes 4x less CPU than the equivalent pipeline in OpenCV.
 
