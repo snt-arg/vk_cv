@@ -24,6 +24,10 @@ On the Raspberry Pi4, the Vulkan accelerated pipeline is about 2x faster and tak
 
 * Initial release
 
+## Requirements
+
+Requires Vulkan 1.1 or higher.
+
 ## License
 
 TBD
