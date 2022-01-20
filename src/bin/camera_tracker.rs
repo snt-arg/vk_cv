@@ -115,7 +115,7 @@ fn main() -> Result<()> {
     );
 
     let start_of_program = std::time::Instant::now();
-    let mut frame = 0;
+    let mut frame = 0u32;
 
     loop {
         // grab depth and color image from the realsense
@@ -135,8 +135,8 @@ fn main() -> Result<()> {
             .unwrap();
 
         // wait till finished
-        std::thread::sleep(avg_pipeline_execution_duration);
-        future.wait(None).unwrap();
+        std::thread::sleep(avg_pipeline_execution_duration); // the results are likely ready after we wake up
+        future.wait(None).unwrap(); // spin-lock?
 
         // print results
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
