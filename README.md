@@ -1,4 +1,4 @@
-# VKCV
+# vk-cv
 
 A fast and lightweight Vulkan accelerated graphics pipeline for simple color tracking.
 
