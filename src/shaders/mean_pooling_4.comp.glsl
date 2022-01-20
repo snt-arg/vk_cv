@@ -4,8 +4,6 @@ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 layout(set = 0, binding = 0, rgba32f) uniform image2D inputImage;
 layout(set = 0, binding = 1, rgba32f) uniform image2D resultImage;
 
-layout(constant_id = 2) const float inv_size = 1.0;
-
 void main() {
   ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 
