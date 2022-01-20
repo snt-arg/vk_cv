@@ -33,5 +33,5 @@ void main() {
   d += imageLoad(inputImage, p + ivec2(3, 2));
   d += imageLoad(inputImage, p + ivec2(3, 3));
 
-  imageStore(resultImage, id, d * 0.125);
+  imageStore(resultImage, id, d * 0.0625);
 }
