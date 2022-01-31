@@ -6,6 +6,7 @@ pub mod hsvconv;
 pub mod input;
 pub mod morphology;
 pub mod output;
+pub mod pooling;
 pub mod tracker;
 
 use std::sync::Arc;

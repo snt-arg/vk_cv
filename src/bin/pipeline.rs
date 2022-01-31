@@ -9,7 +9,8 @@ use vkcv::{
         input::Input,
         morphology::{Morphology, Operation},
         output::Output,
-        tracker::{Canvas, Pooling, Tracker},
+        pooling::{self, Pooling},
+        tracker::{self, Canvas, Tracker},
     },
     utils::{cv_pipeline_sequential, cv_pipeline_sequential_debug, load_image},
     vk_init,
@@ -34,7 +35,7 @@ fn main() -> Result<()> {
     std::env::set_var("DISPLAY", ":0");
     std::env::set_var("V3D_DEBUG", "perf");
 
-    let (img_info, img_data) = load_image("tracking_3_1px.png");
+    let (img_info, img_data) = load_image("Large_Scaled_Forest_Lizard.png");
 
     // init device
     let (device, mut queues) = vk_init::init();
@@ -46,12 +47,12 @@ fn main() -> Result<()> {
 
     let pe_hsv = Hsvconv::new();
     let pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
-
+    let pe_pooling = Pooling::new(pooling::Operation::Max);
     // let pe_conv = Convolution::new(device.clone(), queue.clone(), &pe_hsv_filter);
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_tracker = Tracker::new(Pooling::SampledPooling4, Canvas::Pad);
+    let pe_tracker = Tracker::new(tracker::PoolingStrategy::SampledPooling4, Canvas::Pad);
     let pe_out = Output::new();
 
     let dp = cv_pipeline_sequential_debug(
@@ -61,7 +62,10 @@ fn main() -> Result<()> {
         &[
             &pe_hsv,
             &pe_hsv_filter,
-            /*&pe_erode, &pe_dilate,*/ &pe_tracker,
+            &pe_pooling,
+            &pe_erode,
+            &pe_dilate,
+            &pe_tracker,
         ],
         &pe_out,
     );

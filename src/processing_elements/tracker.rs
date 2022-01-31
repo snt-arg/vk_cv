@@ -60,7 +60,7 @@ mod cs_pool4_sampler {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Pooling {
+pub enum PoolingStrategy {
     Pooling4,
     Pooling2,
     SampledPooling4,
@@ -74,12 +74,12 @@ pub enum Canvas {
 }
 
 pub struct Tracker {
-    pooling: Pooling,
+    pooling: PoolingStrategy,
     canvas: Canvas,
 }
 
 impl Tracker {
-    pub fn new(pooling: Pooling, canvas: Canvas) -> Self {
+    pub fn new(pooling: PoolingStrategy, canvas: Canvas) -> Self {
         Self { pooling, canvas }
     }
 
@@ -226,7 +226,7 @@ impl Tracker {
         queue: Arc<Queue>,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         mut input_img: Arc<StorageImage>,
-        pooling_strategy: Pooling,
+        pooling_strategy: PoolingStrategy,
     ) -> Arc<StorageImage> {
         let size = input_img.dimensions().width_height();
         assert_eq!(size[0], size[1]);
@@ -236,7 +236,7 @@ impl Tracker {
         let remaining_divs_by_2 = divs_by_2 - (divs_by_4 * 2);
 
         match pooling_strategy {
-            Pooling::Pooling4 => {
+            PoolingStrategy::Pooling4 => {
                 for _ in 0..divs_by_4 {
                     input_img =
                         Self::pooling4(device.clone(), queue.clone(), builder, input_img, false);
@@ -247,7 +247,7 @@ impl Tracker {
                         Self::pooling2(device.clone(), queue.clone(), builder, input_img, false);
                 }
             }
-            Pooling::SampledPooling4 => {
+            PoolingStrategy::SampledPooling4 => {
                 for _ in 0..divs_by_4 {
                     input_img =
                         Self::pooling4(device.clone(), queue.clone(), builder, input_img, true);
@@ -258,13 +258,13 @@ impl Tracker {
                         Self::pooling2(device.clone(), queue.clone(), builder, input_img, true);
                 }
             }
-            Pooling::Pooling2 => {
+            PoolingStrategy::Pooling2 => {
                 for _ in 0..divs_by_2 {
                     input_img =
                         Self::pooling2(device.clone(), queue.clone(), builder, input_img, false);
                 }
             }
-            Pooling::SampledPooling2 => {
+            PoolingStrategy::SampledPooling2 => {
                 for _ in 0..divs_by_2 {
                     input_img =
                         Self::pooling2(device.clone(), queue.clone(), builder, input_img, true);
