@@ -308,3 +308,13 @@ impl DebugPipeline {
         }
     }
 }
+
+pub fn label(name: &str, image: &StorageImage) -> String {
+    format!(
+        "{} ({}x{}:{})",
+        name,
+        image.dimensions().width(),
+        image.dimensions().height(),
+        image.format().components().iter().sum::<u8>()
+    )
+}

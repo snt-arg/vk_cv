@@ -82,8 +82,8 @@ impl ProcessingElement for Hsvconv {
 
         IoFragment {
             input: Io::Image(input_img),
-            output: Io::Image(output_img),
-            label: "HSV conversion".to_string(),
+            output: Io::Image(output_img.clone()),
+            label: utils::label("HSV conversion", &output_img),
         }
     }
 }

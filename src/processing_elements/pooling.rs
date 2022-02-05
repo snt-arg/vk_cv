@@ -67,12 +67,16 @@ impl ProcessingElement for Pooling {
         let input_img = input.output_image().unwrap();
 
         // output image
+        let output_size = (
+            input_img.dimensions().width() / 2,
+            input_img.dimensions().height() / 2,
+        );
         let output_img = utils::create_storage_image(
             device.clone(),
             queue.clone(),
             &utils::ImageInfo {
-                width: input_img.dimensions().width() / 2,
-                height: input_img.dimensions().height() / 2,
+                width: output_size.0,
+                height: output_size.1,
                 format: input_img.format(),
             },
         );
@@ -106,8 +110,8 @@ impl ProcessingElement for Pooling {
 
         IoFragment {
             input: Io::Image(input_img),
-            output: Io::Image(output_img),
-            label: "Morphology".to_string(),
+            output: Io::Image(output_img.clone()),
+            label: utils::label("Pooling", &output_img),
         }
     }
 }

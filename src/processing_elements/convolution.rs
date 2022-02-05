@@ -95,8 +95,8 @@ impl ProcessingElement for Convolution {
 
         IoFragment {
             input: Io::Image(input_img),
-            output: Io::Image(output_img),
-            label: "Convolution (single pass)".to_string(),
+            output: Io::Image(output_img.clone()),
+            label: utils::label("Convolution single pass", &output_img),
         }
     }
 }

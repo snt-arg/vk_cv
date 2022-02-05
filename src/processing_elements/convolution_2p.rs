@@ -149,8 +149,8 @@ impl ProcessingElement for Convolution2Pass {
 
         IoFragment {
             input: Io::Image(input_img),
-            output: Io::Image(output_img),
-            label: "Convolution (two passes)".to_string(),
+            output: Io::Image(output_img.clone()),
+            label: utils::label("Convolution two passes", &output_img),
         }
     }
 }
