@@ -1,12 +1,12 @@
 use std::sync::Arc;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    descriptor_set::PersistentDescriptorSet,
+    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, Queue},
     format::Format,
     image::{view::ImageView, ImageAccess, StorageImage},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
-    sampler::{Filter, MipmapMode, Sampler, SamplerAddressMode},
+    sampler::Sampler,
 };
 
 use crate::utils::{self, ImageInfo};
@@ -133,15 +133,17 @@ impl Tracker {
 
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let mut set_builder = PersistentDescriptorSet::start(layout.clone());
-
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
         let output_img_view = ImageView::new(output_img.clone()).unwrap();
 
-        set_builder.add_image(input_img_view).unwrap();
-        set_builder.add_image(output_img_view).unwrap();
-
-        let set = set_builder.build().unwrap();
+        let set = PersistentDescriptorSet::new(
+            layout.clone(),
+            [
+                WriteDescriptorSet::image_view(0, input_img_view),
+                WriteDescriptorSet::image_view(1, output_img_view),
+            ],
+        )
+        .unwrap();
 
         let workgroups = utils::workgroups(&output_img.dimensions().width_height(), &[16, 16]);
 
@@ -152,7 +154,7 @@ impl Tracker {
                 PipelineBindPoint::Compute,
                 pipeline.layout().clone(),
                 0,
-                set.clone(),
+                set,
             )
             .dispatch(workgroups)
             .unwrap();
@@ -194,15 +196,17 @@ impl Tracker {
 
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let mut set_builder = PersistentDescriptorSet::start(layout.clone());
-
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
         let output_img_view = ImageView::new(output_img.clone()).unwrap();
 
-        set_builder.add_image(input_img_view).unwrap();
-        set_builder.add_image(output_img_view).unwrap();
-
-        let set = set_builder.build().unwrap();
+        let set = PersistentDescriptorSet::new(
+            layout.clone(),
+            [
+                WriteDescriptorSet::image_view(0, input_img_view),
+                WriteDescriptorSet::image_view(1, output_img_view),
+            ],
+        )
+        .unwrap();
 
         let workgroups = utils::workgroups(&sub_dims, &[16, 16]);
 
@@ -331,37 +335,25 @@ impl Tracker {
 
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let mut set_builder = PersistentDescriptorSet::start(layout.clone());
-
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
         let output_img_view = ImageView::new(output_img.clone()).unwrap();
+        let mut desc_writes = vec![];
 
         if use_sampler {
-            let sampler = Sampler::new(
-                device.clone(),
-                Filter::Linear,
-                Filter::Linear,
-                MipmapMode::Nearest,
-                SamplerAddressMode::Repeat,
-                SamplerAddressMode::Repeat,
-                SamplerAddressMode::Repeat,
-                0.0,
-                1.0,
-                0.0,
-                0.0,
-            )
-            .unwrap();
+            let sampler = Sampler::simple_repeat_linear_no_mipmap(device.clone()).unwrap();
 
-            set_builder
-                .add_sampled_image(input_img_view, sampler)
-                .unwrap();
+            desc_writes.push(WriteDescriptorSet::image_view_sampler(
+                0,
+                input_img_view,
+                sampler,
+            ));
         } else {
-            set_builder.add_image(input_img_view).unwrap();
+            desc_writes.push(WriteDescriptorSet::image_view(0, input_img_view));
         }
 
-        set_builder.add_image(output_img_view).unwrap();
+        desc_writes.push(WriteDescriptorSet::image_view(1, output_img_view));
 
-        let set = set_builder.build().unwrap();
+        let set = PersistentDescriptorSet::new(layout.clone(), desc_writes).unwrap();
 
         // workgroups
         let workgroups = utils::workgroups(&output_img.dimensions().width_height(), &local_size);
@@ -437,37 +429,25 @@ impl Tracker {
 
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let mut set_builder = PersistentDescriptorSet::start(layout.clone());
-
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
         let output_img_view = ImageView::new(output_img.clone()).unwrap();
+        let mut desc_writes = vec![];
 
         if use_sampler {
-            let sampler = Sampler::new(
-                device.clone(),
-                Filter::Linear,
-                Filter::Linear,
-                MipmapMode::Nearest,
-                SamplerAddressMode::Repeat,
-                SamplerAddressMode::Repeat,
-                SamplerAddressMode::Repeat,
-                0.0,
-                1.0,
-                0.0,
-                0.0,
-            )
-            .unwrap();
+            let sampler = Sampler::simple_repeat_linear_no_mipmap(device.clone()).unwrap();
 
-            set_builder
-                .add_sampled_image(input_img_view, sampler)
-                .unwrap();
+            desc_writes.push(WriteDescriptorSet::image_view_sampler(
+                0,
+                input_img_view,
+                sampler,
+            ));
         } else {
-            set_builder.add_image(input_img_view).unwrap();
+            desc_writes.push(WriteDescriptorSet::image_view(0, input_img_view));
         }
 
-        set_builder.add_image(output_img_view).unwrap();
+        desc_writes.push(WriteDescriptorSet::image_view(1, output_img_view));
 
-        let set = set_builder.build().unwrap();
+        let set = PersistentDescriptorSet::new(layout.clone(), desc_writes).unwrap();
 
         // let workgroups =  (out_size as f32 / local_size as f32).ceil() as u32;
         let workgroups = utils::workgroups(&output_img.dimensions().width_height(), &local_size);

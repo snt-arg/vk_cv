@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    descriptor_set::PersistentDescriptorSet,
+    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, Queue},
     image::{view::ImageView, ImageAccess},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
@@ -83,15 +83,17 @@ impl ProcessingElement for Pooling {
 
         // setup layout
         let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let mut set_builder = PersistentDescriptorSet::start(layout.clone());
-
         let input_img_view = ImageView::new(input_img.clone()).unwrap();
         let output_img_view = ImageView::new(output_img.clone()).unwrap();
 
-        set_builder.add_image(input_img_view).unwrap();
-        set_builder.add_image(output_img_view).unwrap();
-
-        let set = set_builder.build().unwrap();
+        let set = PersistentDescriptorSet::new(
+            layout.clone(),
+            [
+                WriteDescriptorSet::image_view(0, input_img_view),
+                WriteDescriptorSet::image_view(1, output_img_view),
+            ],
+        )
+        .unwrap();
 
         builder
             .bind_pipeline_compute(pipeline.clone())

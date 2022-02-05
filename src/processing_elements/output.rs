@@ -27,7 +27,7 @@ impl ProcessingElement for Output {
         // input image
         if let Some(input_img) = input.output_image() {
             // output buffer (cpu accessible)
-            let depth = input_img.format().size().unwrap() as u32;
+            let depth = (input_img.format().components().iter().sum::<u8>() / 8) as u32;
             let count = input_img.dimensions().width()
                 * input_img.dimensions().height()
                 * input_img.dimensions().depth()
