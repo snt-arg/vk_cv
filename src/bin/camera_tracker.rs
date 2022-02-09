@@ -208,16 +208,17 @@ pub fn draw_centroid(frame: &ColorFrame, centroid: &[f32; 2]) -> Vec<u8> {
     let size = 16;
     let cx = centroid[0] as i32;
     let cy = centroid[1] as i32;
+
     // vertical line
     for y in cy - size..cy + size {
-        let y = y.clamp(0, frame.height() as i32);
+        let y = y.clamp(0, (frame.height() - 1) as i32);
         let offset = cx * bpp + y * stride;
         bytes[offset as usize] = 255;
     }
 
     // horizontal line
     for x in cx - size..cx + size {
-        let x = x.clamp(0, frame.width() as i32);
+        let x = x.clamp(0, (frame.width() - 1) as i32);
         let offset = x * bpp + cy * stride;
         bytes[offset as usize] = 255;
     }
