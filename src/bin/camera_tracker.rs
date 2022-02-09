@@ -8,7 +8,8 @@ use vkcv::{
         output::Output,
         tracker::{Canvas, PoolingStrategy, Tracker},
     },
-    realsense::Realsense,
+    realsense::{ColorFrame, Realsense},
+    utils,
     utils::{cv_pipeline_sequential, cv_pipeline_sequential_debug},
     vk_init,
 };
@@ -168,6 +169,12 @@ fn main() -> Result<()> {
                 dbg!(point);
             }
             dbg!(c);
+
+            // paint the centroid
+            if DBG_PROFILE && frame % 30 == 0 {
+                let bytes = draw_centroid(&color_image, &pixel_coords);
+                utils::write_image(&format!("out/centroid-{}", frame), &bytes, &img_info);
+            }
         }
 
         // debug
@@ -190,4 +197,29 @@ fn main() -> Result<()> {
 
         frame += 1;
     }
+}
+
+pub fn draw_centroid(frame: &ColorFrame, centroid: &[f32; 2]) -> Vec<u8> {
+    let mut bytes = frame.data_slice().to_owned();
+    let stride = frame.stride() as i32;
+
+    // draw a cross at the position of the centroid
+    let size = 16;
+    let cx = centroid[0] as i32;
+    let cy = centroid[1] as i32;
+    // vertical line
+    for y in cy - size..cy + size {
+        let y = y.clamp(0, frame.height() as i32);
+        let offset = cx * 4 + y * stride;
+        bytes[offset as usize] = 255;
+    }
+
+    // horizontal line
+    for x in cx - size..cx + size {
+        let x = x.clamp(0, frame.width() as i32);
+        let offset = x * 4 + cy * stride;
+        bytes[offset as usize] = 255;
+    }
+
+    bytes
 }

@@ -357,7 +357,7 @@ impl Frame {
         crate::utils::write_image(
             image_path,
             self.data_slice(),
-            ImageInfo {
+            &ImageInfo {
                 width: self.width(),
                 height: self.height(),
                 format: R8G8B8A8_UNORM,

@@ -1,12 +1,17 @@
 {
     "ros.distro": "noetic",
     "cSpell.words": [
+        "deproject",
         "divs",
+        "extrinsics",
         "glsl",
+        "Hsvconv",
+        "intrinsics",
         "Mipmap",
         "realsense",
         "SFLOAT",
         "UNORM",
+        "vkcv",
         "vulkano",
         "workgroups"
     ]

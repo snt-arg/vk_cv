@@ -11,6 +11,7 @@ use crate::endpoints::image_download::ImageDownload;
 use crate::processing_elements::output::Output;
 use crate::processing_elements::{IoFragment, PipeInput, PipeOutput, ProcessingElement};
 
+#[derive(Debug, Clone, Copy)]
 pub struct ImageInfo {
     pub width: u32,
     pub height: u32,
@@ -74,7 +75,7 @@ pub fn load_image(image_path: &str) -> (ImageInfo, Vec<u8>) {
     )
 }
 
-pub fn write_image(image_path: &str, data: &[u8], img_info: ImageInfo) {
+pub fn write_image(image_path: &str, data: &[u8], img_info: &ImageInfo) {
     let p = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), image_path);
     let path = Path::new(&p);
     let file = File::create(path).unwrap();

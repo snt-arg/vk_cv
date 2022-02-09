@@ -28,7 +28,7 @@ impl ImageDownload {
             format: input_img.format(),
         };
 
-        utils::write_image(filename, &buffer_content, info);
+        utils::write_image(filename, &buffer_content, &info);
     }
 
     pub fn centroid(&self) -> ([f32; 2], f32) {
