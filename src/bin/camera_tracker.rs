@@ -171,7 +171,7 @@ fn main() -> Result<()> {
             dbg!(c);
 
             // paint the centroid
-            if DBG_PROFILE && frame % 30 == 0 {
+            if DBG_PROFILE && frame % 15 == 0 {
                 let bytes = draw_centroid(&color_image, &pixel_coords);
                 utils::write_image(&format!("out/centroid-{}", frame), &bytes, &img_info);
             }
@@ -202,6 +202,7 @@ fn main() -> Result<()> {
 pub fn draw_centroid(frame: &ColorFrame, centroid: &[f32; 2]) -> Vec<u8> {
     let mut bytes = frame.data_slice().to_owned();
     let stride = frame.stride() as i32;
+    let bpp = frame.bytes_per_pixel() as i32;
 
     // draw a cross at the position of the centroid
     let size = 16;
@@ -210,14 +211,14 @@ pub fn draw_centroid(frame: &ColorFrame, centroid: &[f32; 2]) -> Vec<u8> {
     // vertical line
     for y in cy - size..cy + size {
         let y = y.clamp(0, frame.height() as i32);
-        let offset = cx * 4 + y * stride;
+        let offset = cx * bpp + y * stride;
         bytes[offset as usize] = 255;
     }
 
     // horizontal line
     for x in cx - size..cx + size {
         let x = x.clamp(0, frame.width() as i32);
-        let offset = x * 4 + cy * stride;
+        let offset = x * bpp + cy * stride;
         bytes[offset as usize] = 255;
     }
 

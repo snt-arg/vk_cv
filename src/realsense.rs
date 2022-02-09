@@ -349,6 +349,10 @@ impl Frame {
         }
     }
 
+    pub fn bytes_per_pixel(&self) -> u32 {
+        self.stride() / self.width()
+    }
+
     pub fn stride(&self) -> u32 {
         unsafe { rs2_get_frame_stride_in_bytes(self.frame, ptr::null_mut()) as u32 }
     }
