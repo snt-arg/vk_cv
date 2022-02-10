@@ -1,0 +1,11 @@
+[package]
+name = "ros2-publisher"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+vkcv = { path = "../../" }
+r2r = "0.6.2"
+tokio = { version = "1.15.0", features = ["full"] }
