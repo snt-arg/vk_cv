@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     // depth resolutions
     // 640x480
     // 480x270
-    let mut camera = Realsense::open(&[640, 480], 30, &[640, 480], 30);
+    let mut camera = Realsense::open(&[640, 480], 30, &[640, 480], 30).unwrap();
 
     // grab a couple of frames
     for _ in 0..5 {

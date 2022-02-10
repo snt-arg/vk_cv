@@ -5,14 +5,19 @@ use vulkano::format::Format::R8G8B8A8_UNORM;
 
 use crate::utils::ImageInfo;
 
-fn panic_err(err: *const rs2_error) {
+fn check_err(err: *const rs2_error) -> Result<(), String> {
     unsafe {
         if err != ptr::null() {
             let msg = rs2_get_error_message(err);
             let msg_str = std::ffi::CStr::from_ptr(msg);
-            panic!("RS2: error '{}'", msg_str.to_str().unwrap());
+            return Err(msg_str.to_str().unwrap().to_owned());
         }
     }
+    Ok(())
+}
+
+fn panic_err(err: *const rs2_error) {
+    check_err(err).unwrap();
 }
 
 #[derive(Debug)]
@@ -32,24 +37,31 @@ impl Realsense {
         color_framerate: u32,
         depth_dimensions: &[u32; 2],
         depth_framerate: u32,
-    ) -> Self {
+    ) -> Result<Self, String> {
         unsafe {
             let mut err = ptr::null_mut();
             let ctx = rs2_create_context(RS2_API_VERSION as i32, &mut err);
-            panic_err(err);
+            check_err(err)?;
 
             let device_list = rs2_query_devices(ctx, &mut err);
-            panic_err(err);
+            check_err(err)?;
+
+            let device_count = rs2_get_device_count(device_list, &mut err);
+            check_err(err)?;
+            if device_count == 0 {
+                return Err("No realsense camera found".to_string());
+            }
+
             let dev = rs2_create_device(device_list, 0, &mut err);
-            panic_err(err);
+            check_err(err)?;
             rs2_delete_device_list(device_list);
 
             // query depth scale
             let mut depth_scale = 1.0;
             let sensor_list = rs2_query_sensors(dev, &mut err);
-            panic_err(err);
+            check_err(err)?;
             let sensor_count = rs2_get_sensors_count(sensor_list, &mut err);
-            panic_err(err);
+            check_err(err)?;
             for i in 0..sensor_count {
                 let sensor = rs2_create_sensor(sensor_list, i, &mut err);
                 panic_err(err);
@@ -73,9 +85,9 @@ impl Realsense {
 
             // setup pipeline
             let pipe = rs2_create_pipeline(ctx, &mut err);
-            panic_err(err);
+            check_err(err)?;
             let config = rs2_create_config(&mut err);
-            panic_err(err);
+            check_err(err)?;
             rs2_config_enable_stream(
                 config,
                 rs2_stream_RS2_STREAM_COLOR,
@@ -97,16 +109,16 @@ impl Realsense {
                 ptr::null_mut(),
             );
             let profile = rs2_pipeline_start_with_config(pipe, config, &mut err);
-            panic_err(err);
+            check_err(err)?;
 
-            Realsense {
+            Ok(Realsense {
                 ctx,
                 config,
                 pipe,
                 profile,
                 dev,
                 depth_scale,
-            }
+            })
         }
     }
 
