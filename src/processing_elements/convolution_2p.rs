@@ -90,15 +90,11 @@ impl ProcessingElement for Convolution2Pass {
             utils::create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
 
         // setup layout
-        let input_img_view = ImageView::new(input_img.clone()).unwrap();
-        let intermediate_img_view = ImageView::new(intermediate_img.clone()).unwrap();
-        let output_img_view = ImageView::new(output_img.clone()).unwrap();
+        let input_img_view = ImageView::new_default(input_img.clone()).unwrap();
+        let intermediate_img_view = ImageView::new_default(intermediate_img.clone()).unwrap();
+        let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
-        let layout_1p = pipeline_1p
-            .layout()
-            .descriptor_set_layouts()
-            .get(0)
-            .unwrap();
+        let layout_1p = pipeline_1p.layout().set_layouts().get(0).unwrap();
 
         let set_1p = PersistentDescriptorSet::new(
             layout_1p.clone(),
@@ -109,11 +105,7 @@ impl ProcessingElement for Convolution2Pass {
         )
         .unwrap();
 
-        let layout_2p = pipeline_2p
-            .layout()
-            .descriptor_set_layouts()
-            .get(0)
-            .unwrap();
+        let layout_2p = pipeline_2p.layout().set_layouts().get(0).unwrap();
 
         let set_2p = PersistentDescriptorSet::new(
             layout_2p.clone(),

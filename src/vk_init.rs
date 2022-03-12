@@ -1,12 +1,16 @@
 use std::sync::Arc;
 use vulkano::device::physical::{PhysicalDevice, PhysicalDeviceType};
-use vulkano::device::{Device, DeviceExtensions, Features, QueuesIter};
-use vulkano::instance::{Instance, InstanceExtensions};
+use vulkano::device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo};
+use vulkano::instance::{Instance, InstanceCreateInfo};
 use vulkano::Version;
 
-pub fn init() -> (Arc<Device>, QueuesIter) {
-    // Note RPI4 claims VK1.1 compliance
-    let instance = Instance::new(None, Version::V1_1, &InstanceExtensions::none(), None).unwrap();
+pub fn init() -> (Arc<Device>, Arc<Queue>) {
+    // Note RPI4 claims VK1.1 compliances
+    let ci = InstanceCreateInfo {
+        max_api_version: Some(Version::V1_1),
+        ..Default::default()
+    };
+    let instance = Instance::new(ci).unwrap();
 
     // extensions
     let device_extensions = DeviceExtensions {
@@ -16,7 +20,7 @@ pub fn init() -> (Arc<Device>, QueuesIter) {
     };
 
     // queue devices
-    let (physical_device, queue_family) = PhysicalDevice::enumerate(&instance)
+    let (physical_device, _queue_family) = PhysicalDevice::enumerate(&instance)
         .filter(|&p| p.supported_extensions().is_superset_of(&device_extensions))
         .filter_map(|p| {
             // The Vulkan specs guarantee that a compliant implementation must provide at least one queue
@@ -40,14 +44,27 @@ pub fn init() -> (Arc<Device>, QueuesIter) {
         physical_device.properties().device_type
     );
 
+    let (_gfx_index, queue_family_graphics) = physical_device
+        .queue_families()
+        .enumerate()
+        .find(|&(_i, q)| q.supports_graphics())
+        .unwrap();
+
     // init device
-    Device::new(
+    let (device, mut queues) = Device::new(
         physical_device,
-        &Features::none(),
-        &physical_device
-            .required_extensions()
-            .union(&device_extensions),
-        [(queue_family, 0.5)].iter().cloned(),
+        DeviceCreateInfo {
+            enabled_extensions: physical_device
+                .required_extensions()
+                .union(&device_extensions),
+            queue_create_infos: vec![QueueCreateInfo {
+                queues: vec![0.5],
+                ..QueueCreateInfo::family(queue_family_graphics)
+            }],
+            ..Default::default()
+        },
     )
-    .unwrap()
+    .unwrap();
+
+    (device, queues.next().unwrap())
 }

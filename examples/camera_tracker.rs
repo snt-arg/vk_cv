@@ -51,8 +51,7 @@ fn main() -> Result<()> {
     let img_info = camera.fetch_image().0.image_info();
 
     // init device
-    let (device, mut queues) = vk_init::init();
-    let queue = queues.next().unwrap();
+    let (device, queue) = vk_init::init();
 
     // create a color tracking pipeline
     let pe_input = Input::new(img_info);

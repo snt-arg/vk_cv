@@ -38,8 +38,7 @@ fn main() -> Result<()> {
     let (img_info, img_data) = load_image("Large_Scaled_Forest_Lizard.png");
 
     // init device
-    let (device, mut queues) = vk_init::init();
-    let queue = queues.next().unwrap();
+    let (device, queue) = vk_init::init();
 
     // create a convolution pipeline
     let pe_input = Input::new(img_info);

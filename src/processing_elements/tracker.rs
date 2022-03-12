@@ -6,7 +6,7 @@ use vulkano::{
     format::Format,
     image::{view::ImageView, ImageAccess, StorageImage},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
-    sampler::Sampler,
+    sampler::{Sampler, SamplerCreateInfo},
 };
 
 use crate::utils::{self, ImageInfo};
@@ -132,9 +132,9 @@ impl Tracker {
         );
 
         // setup layout
-        let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let input_img_view = ImageView::new(input_img.clone()).unwrap();
-        let output_img_view = ImageView::new(output_img.clone()).unwrap();
+        let layout = pipeline.layout().set_layouts().get(0).unwrap();
+        let input_img_view = ImageView::new_default(input_img.clone()).unwrap();
+        let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
         let set = PersistentDescriptorSet::new(
             layout.clone(),
@@ -195,9 +195,9 @@ impl Tracker {
         );
 
         // setup layout
-        let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let input_img_view = ImageView::new(input_img.clone()).unwrap();
-        let output_img_view = ImageView::new(output_img.clone()).unwrap();
+        let layout = pipeline.layout().set_layouts().get(0).unwrap();
+        let input_img_view = ImageView::new_default(input_img.clone()).unwrap();
+        let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
         let set = PersistentDescriptorSet::new(
             layout.clone(),
@@ -334,12 +334,16 @@ impl Tracker {
         );
 
         // setup layout
-        let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let input_img_view = ImageView::new(input_img.clone()).unwrap();
-        let output_img_view = ImageView::new(output_img.clone()).unwrap();
+        let layout = pipeline.layout().set_layouts().get(0).unwrap();
+        let input_img_view = ImageView::new_default(input_img.clone()).unwrap();
+        let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
         let set = if use_sampler {
-            let sampler = Sampler::simple_repeat_linear_no_mipmap(device.clone()).unwrap();
+            let sampler = Sampler::new(
+                device.clone(),
+                SamplerCreateInfo::simple_repeat_linear_no_mipmap(),
+            )
+            .unwrap();
             PersistentDescriptorSet::new(
                 layout.clone(),
                 [
@@ -432,12 +436,16 @@ impl Tracker {
         );
 
         // setup layout
-        let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let input_img_view = ImageView::new(input_img.clone()).unwrap();
-        let output_img_view = ImageView::new(output_img.clone()).unwrap();
+        let layout = pipeline.layout().set_layouts().get(0).unwrap();
+        let input_img_view = ImageView::new_default(input_img.clone()).unwrap();
+        let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
         let set = if use_sampler {
-            let sampler = Sampler::simple_repeat_linear_no_mipmap(device.clone()).unwrap();
+            let sampler = Sampler::new(
+                device.clone(),
+                SamplerCreateInfo::simple_repeat_linear_no_mipmap(),
+            )
+            .unwrap();
             PersistentDescriptorSet::new(
                 layout.clone(),
                 [

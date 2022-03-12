@@ -60,9 +60,9 @@ impl ProcessingElement for Convolution {
             utils::create_storage_image(device.clone(), queue.clone(), &(&input_img).into());
 
         // setup layout
-        let layout = pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let input_img_view = ImageView::new(input_img.clone()).unwrap();
-        let output_img_view = ImageView::new(output_img.clone()).unwrap();
+        let layout = pipeline.layout().set_layouts().get(0).unwrap();
+        let input_img_view = ImageView::new_default(input_img.clone()).unwrap();
+        let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
         let set = PersistentDescriptorSet::new(
             layout.clone(),
