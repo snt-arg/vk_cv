@@ -9,7 +9,10 @@ use vulkano::{
     sampler::{Sampler, SamplerCreateInfo},
 };
 
-use crate::utils::{self, ImageInfo};
+use crate::{
+    endpoints::image_download::TransferredImage,
+    utils::{self, ImageInfo},
+};
 
 use super::{Io, IoFragment, ProcessingElement};
 
@@ -525,7 +528,12 @@ impl ProcessingElement for Tracker {
     }
 }
 
-pub fn centroid(buffer: &[u8]) -> ([f32; 2], f32) {
+pub fn centroid(tf_img: &TransferredImage) -> ([f32; 2], f32) {
+    assert_eq!(tf_img.info().width, 1);
+    assert_eq!(tf_img.info().height, 1);
+    assert_eq!(tf_img.info().format, Format::R32G32B32A32_SFLOAT);
+
+    let buffer = tf_img.buffer_content();
     let x = f32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
     let y = f32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
     let z = f32::from_le_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]);

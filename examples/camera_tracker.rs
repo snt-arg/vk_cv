@@ -140,7 +140,7 @@ fn main() -> Result<()> {
 
         // print results
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
-        let (c, area) = tracker::centroid(&download.transfer().buffer_content());
+        let (c, area) = tracker::centroid(&download.transfer());
         let area_px = (area * color_image.area() as f32) as u32;
 
         if DBG_PROFILE {

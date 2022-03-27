@@ -87,7 +87,7 @@ fn main() -> Result<()> {
 
     let tf_img = download.transfer();
     tf_img.save_output_buffer("out_0.png");
-    dbg!(tracker::centroid(&tf_img.buffer_content()));
+    dbg!(tracker::centroid(&tf_img));
 
     Ok(())
 }

@@ -66,4 +66,8 @@ impl<'a> TransferredImage<'a> {
     pub fn save_output_buffer(&self, filename: &str) {
         utils::write_image(filename, &self.buffer_content(), &self.info);
     }
+
+    pub fn info(&self) -> &'a ImageInfo {
+        self.info
+    }
 }
