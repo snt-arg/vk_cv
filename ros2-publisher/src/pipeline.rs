@@ -53,8 +53,7 @@ pub fn process_blocking(config: Config, sender: UnboundedSender<Point3>) {
     let img_info = camera.fetch_image().0.image_info();
 
     // init device
-    let (device, mut queues) = vk_init::init();
-    let queue = queues.next().unwrap();
+    let (device, queue) = vk_init::init();
 
     // create a color tracking pipeline
     let pe_input = Input::new(img_info);
@@ -62,7 +61,7 @@ pub fn process_blocking(config: Config, sender: UnboundedSender<Point3>) {
     let pe_hsv_filter = ColorFilter::new(config.hsv_min, config.hsv_max);
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
+    let pe_tracker = Tracker::new(PoolingStrategy::SampledPooling4, Canvas::Pad);
     let pe_out = Output::new();
 
     let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(
