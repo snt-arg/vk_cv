@@ -525,6 +525,14 @@ impl ProcessingElement for Tracker {
     }
 }
 
+pub fn centroid(buffer: &[u8]) -> ([f32; 2], f32) {
+    let x = f32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
+    let y = f32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
+    let z = f32::from_le_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]);
+
+    ([x / z, y / z], z)
+}
+
 #[cfg(test)]
 mod test {
     #[test]

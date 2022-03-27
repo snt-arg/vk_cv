@@ -1,6 +1,6 @@
 [package]
 name = "vkcv"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -12,5 +12,3 @@ png = "0.17"
 anyhow = "1"
 
 realsense-sys = {version="2.47.0", features=["buildtime-bindgen"]}
-# drm = "0.6.1"
-# gbm = "0.7.0"

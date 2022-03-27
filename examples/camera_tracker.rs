@@ -6,7 +6,7 @@ use vkcv::{
         input::Input,
         morphology::{Morphology, Operation},
         output::Output,
-        tracker::{Canvas, PoolingStrategy, Tracker},
+        tracker::{self, Canvas, PoolingStrategy, Tracker},
     },
     realsense::{ColorFrame, Realsense},
     utils,
@@ -79,7 +79,7 @@ fn main() -> Result<()> {
     );
 
     let upload = ImageUpload::from_io(input_io).unwrap();
-    let download = ImageDownload::from_io(output_io).unwrap();
+    let mut download = ImageDownload::from_io(output_io).unwrap();
 
     let mut avg_pipeline_execution_duration = std::time::Duration::ZERO;
 
@@ -140,7 +140,7 @@ fn main() -> Result<()> {
 
         // print results
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
-        let (c, area) = download.centroid();
+        let (c, area) = tracker::centroid(&download.transfer().buffer_content());
         let area_px = (area * color_image.area() as f32) as u32;
 
         if DBG_PROFILE {

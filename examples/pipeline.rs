@@ -17,7 +17,6 @@ use vkcv::{
 };
 
 use anyhow::Result;
-use vulkano::sync::{self, GpuFuture};
 
 fn main() -> Result<()> {
     // let mut realsense = Realsense::open();
@@ -29,8 +28,6 @@ fn main() -> Result<()> {
     // maxPushConstantsSize: 128
     //
     // https://vulkan.gpuinfo.org/displayreport.php?id=13073#properties
-
-    println!("Realsense camera tracker");
 
     std::env::set_var("DISPLAY", ":0");
     std::env::set_var("V3D_DEBUG", "perf");
@@ -51,7 +48,7 @@ fn main() -> Result<()> {
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_tracker = Tracker::new(tracker::PoolingStrategy::SampledPooling4, Canvas::Pad);
+    let pe_tracker = Tracker::new(tracker::PoolingStrategy::Pooling4, Canvas::Pad);
     let pe_out = Output::new();
 
     let dp = cv_pipeline_sequential_debug(
@@ -70,7 +67,7 @@ fn main() -> Result<()> {
     );
 
     let upload = ImageUpload::from_io(dp.input.clone()).unwrap();
-    let download = ImageDownload::from_io(dp.output.clone()).unwrap();
+    let mut download = ImageDownload::from_io(dp.output.clone()).unwrap();
 
     // let color_image = realsense.fetch_image();
     //println!("{} x {}", color_image.width(), color_image.height());
@@ -88,8 +85,9 @@ fn main() -> Result<()> {
     let pipeline_dt = std::time::Instant::now() - pipeline_started;
     println!("Pipeline took {} us", pipeline_dt.as_micros());
 
-    download.save_output_buffer("out_0.png");
-    dbg!(download.centroid());
+    let tf_img = download.transfer();
+    tf_img.save_output_buffer("out_0.png");
+    dbg!(tracker::centroid(&tf_img.buffer_content()));
 
     Ok(())
 }

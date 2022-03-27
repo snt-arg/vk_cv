@@ -305,8 +305,10 @@ impl DebugPipeline {
         self.dispatch(device, queue);
         std::fs::create_dir_all(dir).unwrap();
         for (i, io) in self.debug_outputs.iter().enumerate() {
-            let download = ImageDownload::from_io(io.clone()).unwrap();
-            download.save_output_buffer(&format!("{}/{}{}.png", dir, prefix, i))
+            let mut download = ImageDownload::from_io(io.clone()).unwrap();
+            download
+                .transfer()
+                .save_output_buffer(&format!("{}/{}{}.png", dir, prefix, i))
         }
     }
 }

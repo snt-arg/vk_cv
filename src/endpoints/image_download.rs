@@ -7,43 +7,63 @@ use crate::{
 
 pub struct ImageDownload {
     io: IoFragment,
+    info: ImageInfo,
+    buffer: Vec<u8>,
 }
 
 impl ImageDownload {
     pub fn from_io(io: IoFragment) -> Result<Self, &'static str> {
         match &io.output {
-            Io::Buffer(_) => Ok(Self { io }),
+            Io::Buffer(_) => {
+                let input_img = io.input_image().unwrap();
+
+                let info = ImageInfo {
+                    width: input_img.dimensions().width(),
+                    height: input_img.dimensions().height(),
+                    format: input_img.format(),
+                };
+
+                Ok(Self {
+                    io,
+                    info,
+                    buffer: Vec::new(),
+                })
+            }
             _ => Err("Output needs to be a buffer"),
         }
     }
 
-    pub fn save_output_buffer(&self, filename: &str) {
-        let buffer = self.io.output_buffer().unwrap();
-        let buffer_content = buffer.read().unwrap();
-        let input_img = self.io.input_image().unwrap();
-
-        let info = ImageInfo {
-            width: input_img.dimensions().width(),
-            height: input_img.dimensions().height(),
-            format: input_img.format(),
-        };
-
-        utils::write_image(filename, &buffer_content, &info);
+    pub fn image_info(&self) -> &ImageInfo {
+        &self.info
     }
 
-    pub fn centroid(&self) -> ([f32; 2], f32) {
+    pub fn transfer<'a>(&'a mut self) -> TransferredImage<'a> {
         let buffer = self.io.output_buffer().unwrap();
-        let data = buffer.read().unwrap();
+        let buffer_content = buffer.read().unwrap();
+        if self.buffer.len() != buffer_content.len() {
+            self.buffer.resize(buffer_content.len(), 0);
+        }
 
-        let x = f32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        // dbg!(x);
-        let y = f32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-        // dbg!(y);
-        let z = f32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-        // dbg!(z);
+        self.buffer.copy_from_slice(&buffer_content);
 
-        // dbg!(x / z, y / z);
+        TransferredImage {
+            buffer: &self.buffer,
+            info: &self.info,
+        }
+    }
+}
 
-        ([x / z, y / z], z)
+pub struct TransferredImage<'a> {
+    buffer: &'a [u8],
+    info: &'a ImageInfo,
+}
+
+impl<'a> TransferredImage<'a> {
+    pub fn buffer_content(&self) -> &[u8] {
+        &self.buffer
+    }
+
+    pub fn save_output_buffer(&self, filename: &str) {
+        utils::write_image(filename, &self.buffer_content(), &self.info);
     }
 }

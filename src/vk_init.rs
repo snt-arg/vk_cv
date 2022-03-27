@@ -5,7 +5,7 @@ use vulkano::instance::{Instance, InstanceCreateInfo};
 use vulkano::Version;
 
 pub fn init() -> (Arc<Device>, Arc<Queue>) {
-    // Note RPI4 claims VK1.1 compliances
+    // Note RPI4 claims VK1.1 'compliance'
     let ci = InstanceCreateInfo {
         max_api_version: Some(Version::V1_1),
         ..Default::default()
@@ -47,7 +47,7 @@ pub fn init() -> (Arc<Device>, Arc<Queue>) {
     let (_gfx_index, queue_family_graphics) = physical_device
         .queue_families()
         .enumerate()
-        .find(|&(_i, q)| q.supports_graphics())
+        .find(|&(_i, q)| q.supports_compute())
         .unwrap();
 
     // init device
