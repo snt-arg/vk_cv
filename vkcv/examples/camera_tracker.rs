@@ -1,4 +1,5 @@
 use vkcv::{
+    draw::{draw_centroid, OwnedImage},
     endpoints::{image_download::ImageDownload, image_upload::ImageUpload},
     processing_elements::{
         color_filter::ColorFilter,
@@ -9,7 +10,7 @@ use vkcv::{
         tracker::{self, Canvas, PoolingStrategy, Tracker},
     },
     realsense::{ColorFrame, Realsense},
-    utils,
+    utils::{self, ImageInfo},
     utils::{cv_pipeline_sequential, cv_pipeline_sequential_debug},
     vk_init,
 };
@@ -140,7 +141,8 @@ fn main() -> Result<()> {
 
         // print results
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
-        let (c, area) = tracker::centroid(&download.transfer());
+        let tf_image = download.transfer();
+        let (c, area) = tracker::centroid(&tf_image);
         let area_px = (area * color_image.area() as f32) as u32;
 
         if DBG_PROFILE {
@@ -171,8 +173,20 @@ fn main() -> Result<()> {
 
             // paint the centroid
             if DBG_PROFILE && frame % 15 == 0 {
-                let bytes = draw_centroid(&color_image, &pixel_coords);
-                utils::write_image(&format!("out/centroid-{}", frame), &bytes, &img_info);
+                let mut owned_image = OwnedImage {
+                    buffer: color_image.data_slice().to_vec(),
+                    info: ImageInfo {
+                        width: color_image.width(),
+                        height: color_image.height(),
+                        format: vulkano::format::Format::R8G8B8A8_UINT,
+                    },
+                };
+                draw_centroid(&mut owned_image, &pixel_coords);
+                utils::write_image(
+                    &format!("out/centroid-{}", frame),
+                    &owned_image.buffer,
+                    &img_info,
+                );
             }
         }
 
@@ -196,31 +210,4 @@ fn main() -> Result<()> {
 
         frame += 1;
     }
-}
-
-pub fn draw_centroid(frame: &ColorFrame, centroid: &[f32; 2]) -> Vec<u8> {
-    let mut bytes = frame.data_slice().to_owned();
-    let stride = frame.stride() as i32;
-    let bpp = frame.bytes_per_pixel() as i32;
-
-    // draw a cross at the position of the centroid
-    let size = 16;
-    let cx = centroid[0] as i32;
-    let cy = centroid[1] as i32;
-
-    // vertical line
-    for y in cy - size..cy + size {
-        let y = y.clamp(0, (frame.height() - 1) as i32);
-        let offset = cx * bpp + y * stride;
-        bytes[offset as usize] = 255;
-    }
-
-    // horizontal line
-    for x in cx - size..cx + size {
-        let x = x.clamp(0, (frame.width() - 1) as i32);
-        let offset = x * bpp + cy * stride;
-        bytes[offset as usize] = 255;
-    }
-
-    bytes
 }

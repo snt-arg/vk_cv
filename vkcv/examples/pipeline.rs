@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     std::env::set_var("DISPLAY", ":0");
     std::env::set_var("V3D_DEBUG", "perf");
 
-    let (img_info, img_data) = load_image("Large_Scaled_Forest_Lizard.png");
+    let (img_info, img_data) = load_image("tracking_1.png");
 
     // init device
     let (device, queue) = vk_init::init();

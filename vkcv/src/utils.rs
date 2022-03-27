@@ -20,8 +20,11 @@ pub struct ImageInfo {
 
 impl ImageInfo {
     pub fn bytes_count(&self) -> u32 {
-        let depth = (self.format.components().iter().sum::<u8>() / 8) as u32;
-        self.width * self.height * depth
+        self.width * self.height * self.bytes_per_pixel()
+    }
+
+    pub fn bytes_per_pixel(&self) -> u32 {
+        (self.format.components().iter().sum::<u8>() / 8) as u32
     }
 
     pub fn from_image(image: &Arc<StorageImage>, format: Format) -> Self {
@@ -30,6 +33,10 @@ impl ImageInfo {
             height: image.dimensions().height(),
             format,
         }
+    }
+
+    pub fn stride(&self) -> u32 {
+        self.width * self.bytes_per_pixel()
     }
 }
 
