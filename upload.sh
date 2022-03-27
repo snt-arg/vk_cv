@@ -1,7 +1,8 @@
 #!/bin/bash
 
-PI_IP=raspberrypi.local
-PI_USER=pi
+# PI_IP=raspberrypi.local
+PI_IP=navio.local
+PI_USER=ubuntu
 PI_PW=raspberry
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
