@@ -2,10 +2,26 @@ mod pipeline;
 
 use r2r::QosProfile;
 use std::time::Duration;
+use structopt::StructOpt;
 use tokio::sync::mpsc;
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "basic")]
+struct Opt {
+    /// Be verbose
+    #[structopt(short, long)]
+    verbose: bool,
+
+    /// Transmits the camera image with a crosshair.
+    /// WARNING: This generates a lot of data!
+    #[structopt(short, long)]
+    transmit_image: bool,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let opt = Opt::from_args();
+
     // mpsc
     let (cv_point3_tx, mut cv_point3_rx) = mpsc::unbounded_channel::<pipeline::Point3>();
     let (cv_image_tx, mut cv_image_rx) = mpsc::unbounded_channel::<pipeline::RosImage>();
@@ -16,8 +32,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // publishers
     let point_pub =
-        node.create_publisher::<pipeline::Point3>("/camera_point", QosProfile::default())?;
-    let local_point_pub =
         node.create_publisher::<pipeline::Point3>("/camera_local_point", QosProfile::default())?;
 
     let image_pub =
@@ -30,7 +44,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // setup vkcv
-    let cv_config = pipeline::Config::default();
+    let cv_config = pipeline::Config {
+        transmit_image: opt.transmit_image,
+        verbose: opt.verbose,
+        ..Default::default()
+    };
 
     let _vkcv_handle = tokio::task::spawn_blocking(move || {
         // vkcv loop

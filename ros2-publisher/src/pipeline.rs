@@ -25,9 +25,11 @@ use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
-    hsv_min: [f32; 3],
-    hsv_max: [f32; 3],
-    min_area: u32,
+    pub hsv_min: [f32; 3],
+    pub hsv_max: [f32; 3],
+    pub min_area: u32,
+    pub transmit_image: bool,
+    pub verbose: bool,
 }
 
 impl Default for Config {
@@ -36,6 +38,8 @@ impl Default for Config {
             hsv_min: [0.20, 0.4, 0.239],
             hsv_max: [0.429, 1.0, 1.0],
             min_area: 225,
+            transmit_image: false,
+            verbose: false,
         }
     }
 }
@@ -158,6 +162,13 @@ pub fn process_blocking(
             ];
             let depth = camera.depth_at_pixel(&pixel_coords, &color_image, &depth_image);
 
+            if config.verbose {
+                println!(
+                    "px coords {}, {}\tdepth {:?}m",
+                    pixel_coords[0], pixel_coords[1], depth
+                );
+            }
+
             // draw centroid
             draw_centroid(&mut owned_image, &pixel_coords);
 
@@ -176,16 +187,18 @@ pub fn process_blocking(
         }
 
         // send image
-        let ros_img = RosImage {
-            header: Default::default(),
-            height: owned_image.info.height,
-            width: owned_image.info.width,
-            encoding: "rgba8".to_string(),
-            is_bigendian: 0,
-            step: owned_image.info.stride(),
-            data: owned_image.buffer,
-        };
+        if config.transmit_image {
+            let ros_img = RosImage {
+                header: Default::default(),
+                height: owned_image.info.height,
+                width: owned_image.info.width,
+                encoding: "rgba8".to_string(),
+                is_bigendian: 0,
+                step: owned_image.info.stride(),
+                data: owned_image.buffer,
+            };
 
-        sender_image.send(ros_img).unwrap();
+            sender_image.send(ros_img).unwrap();
+        }
     }
 }
