@@ -140,7 +140,7 @@ pub fn process_blocking(
         let (c, area) = tracker::centroid(&download.transfer());
         let area_px = (area * color_image.area() as f32) as u32;
 
-        // send frame via ros
+        // owned image
         let mut owned_image = OwnedImage {
             buffer: color_image.data_slice().to_vec(),
             info: ImageInfo {
@@ -175,6 +175,7 @@ pub fn process_blocking(
             }
         }
 
+        // send image
         let ros_img = RosImage {
             header: Default::default(),
             height: owned_image.info.height,
