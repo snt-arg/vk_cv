@@ -1,4 +1,5 @@
 use vkcv::{
+    draw::{draw_centroid, OwnedImage},
     endpoints::{image_download::ImageDownload, image_upload::ImageUpload},
     processing_elements::{
         color_filter::ColorFilter,
@@ -6,15 +7,19 @@ use vkcv::{
         input::Input,
         morphology::{Morphology, Operation},
         output::Output,
-        tracker::{Canvas, PoolingStrategy, Tracker},
+        tracker::{self, Canvas, PoolingStrategy, Tracker},
     },
     realsense::Realsense,
-    utils::cv_pipeline_sequential,
+    utils::{cv_pipeline_sequential, ImageInfo},
     vk_init,
-    vulkano::sync::{self, GpuFuture},
+    vulkano::{
+        self,
+        sync::{self, GpuFuture},
+    },
 };
 
 pub type Point3 = r2r::geometry_msgs::msg::Point;
+pub type RosImage = r2r::sensor_msgs::msg::Image;
 
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -35,7 +40,11 @@ impl Default for Config {
     }
 }
 
-pub fn process_blocking(config: Config, sender: UnboundedSender<Point3>) {
+pub fn process_blocking(
+    config: Config,
+    sender_point3: UnboundedSender<Point3>,
+    sender_image: UnboundedSender<RosImage>,
+) {
     println!("CV: Realsense camera tracker");
 
     // set the default display, otherwise we fallback to llvmpipe
@@ -73,7 +82,7 @@ pub fn process_blocking(config: Config, sender: UnboundedSender<Point3>) {
     );
 
     let upload = ImageUpload::from_io(input_io).unwrap();
-    let download = ImageDownload::from_io(output_io).unwrap();
+    let mut download = ImageDownload::from_io(output_io).unwrap();
 
     let mut avg_pipeline_execution_duration = std::time::Duration::ZERO;
 
@@ -128,8 +137,18 @@ pub fn process_blocking(config: Config, sender: UnboundedSender<Point3>) {
         future.wait(None).unwrap(); // spin-lock?
 
         // print results
-        let (c, area) = download.centroid();
+        let (c, area) = tracker::centroid(&download.transfer());
         let area_px = (area * color_image.area() as f32) as u32;
+
+        // send frame via ros
+        let mut owned_image = OwnedImage {
+            buffer: color_image.data_slice().to_vec(),
+            info: ImageInfo {
+                width: color_image.width(),
+                height: color_image.height(),
+                format: vulkano::format::Format::R8G8B8A8_UINT,
+            },
+        };
 
         // get the depth only if our object is bigger than 225px² (15x15)
         if area_px > config.min_area {
@@ -139,11 +158,14 @@ pub fn process_blocking(config: Config, sender: UnboundedSender<Point3>) {
             ];
             let depth = camera.depth_at_pixel(&pixel_coords, &color_image, &depth_image);
 
+            // draw centroid
+            draw_centroid(&mut owned_image, &pixel_coords);
+
             // de-project to obtain a 3D point in camera coordinates
             if let Some(depth) = depth {
                 let point = camera.deproject_pixel(&pixel_coords, depth, &color_image);
 
-                sender
+                sender_point3
                     .send(Point3 {
                         x: point[0] as f64,
                         y: point[1] as f64,
@@ -152,5 +174,17 @@ pub fn process_blocking(config: Config, sender: UnboundedSender<Point3>) {
                     .unwrap();
             }
         }
+
+        let ros_img = RosImage {
+            header: Default::default(),
+            height: owned_image.info.height,
+            width: owned_image.info.width,
+            encoding: "rgba8".to_string(),
+            is_bigendian: 0,
+            step: owned_image.info.stride(),
+            data: owned_image.buffer,
+        };
+
+        sender_image.send(ros_img).unwrap();
     }
 }

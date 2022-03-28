@@ -1,5 +1,4 @@
 {
-    "ros.distro": "noetic",
     "cSpell.words": [
         "deproject",
         "divs",
@@ -14,5 +13,8 @@
         "vkcv",
         "vulkano",
         "workgroups"
-    ]
+    ],
+    "ros.distro": "foxy",
+    "ros.rosSetupScript": "/opt/ros/foxy/setup.bash",
+    "ros.isolateEnvironment": false,
 }
