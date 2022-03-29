@@ -98,12 +98,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if opt.verbose {
                         println!("Has lock: {}", has_lock);
                     }
-                }
+                },
                 Some(msg) = cv_point3_rx.recv() => {
                     last_seen = Some(std::time::Instant::now());
                     point_pub.publish(&msg).unwrap();
                     // TODO: publish point in vehicle frame
-                }
+                },
                 Some(image) = cv_image_rx.recv() => {
                     let image = Image {
                         pixels: image.buffer.as_slice(),
