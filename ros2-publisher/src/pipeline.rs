@@ -7,6 +7,7 @@ use vkcv::{
         input::Input,
         morphology::{Morphology, Operation},
         output::Output,
+        pooling::{self, Pooling},
         tracker::{self, Canvas, PoolingStrategy, Tracker},
     },
     realsense::Realsense,
@@ -75,13 +76,21 @@ pub fn process_blocking(
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
     let pe_tracker = Tracker::new(PoolingStrategy::SampledPooling4, Canvas::Pad);
+    let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
     let pe_out = Output::new();
 
     let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(
         device.clone(),
         queue.clone(),
         &pe_input,
-        &[&pe_hsv, &pe_hsv_filter, &pe_erode, &pe_dilate, &pe_tracker],
+        &[
+            &pe_hsv,
+            &pe_hsv_filter,
+            &pe_erode,
+            &pe_dilate,
+            &pe_pooling,
+            &pe_tracker,
+        ],
         &pe_out,
     );
 
