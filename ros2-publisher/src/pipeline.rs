@@ -20,6 +20,7 @@ use vkcv::{
 };
 
 pub type Point3 = r2r::geometry_msgs::msg::Point;
+pub type Bool = r2r::std_msgs::msg::Bool;
 pub type Image = OwnedImage;
 pub type RosImageCompressed = r2r::sensor_msgs::msg::CompressedImage;
 

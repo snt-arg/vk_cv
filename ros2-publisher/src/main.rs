@@ -23,6 +23,11 @@ struct Opt {
     /// Default: 70.
     #[structopt(short, long, default_value = "70")]
     compressor_quality: i32,
+
+    /// Lock timeout in ms.
+    /// Default: 1000.
+    #[structopt(short, long, default_value = "70")]
+    lock_timeout: u64,
 }
 
 #[tokio::main]
@@ -46,6 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         QosProfile::default(),
     )?;
 
+    let lock_pub = node.create_publisher::<pipeline::Bool>("~/lock", QosProfile::default())?;
+
     // spinner
     let ros_handle = tokio::task::spawn_blocking(move || loop {
         node.spin_once(Duration::from_millis(100));
@@ -68,11 +75,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut compressor = Compressor::new()?;
     compressor.set_quality(opt.compressor_quality);
 
+    // heartbeat
+    let mut lock_ticker = tokio::time::interval(std::time::Duration::from_millis(250));
+
     // main loop
     let _main_handle = tokio::task::spawn(async move {
+        let mut last_seen = None;
+
         loop {
             tokio::select! {
+                _ = lock_ticker.tick() => {
+                    let has_lock = if let Some(last_seen) = last_seen {
+                        std::time::Instant::now() - last_seen < std::time::Duration::from_millis(opt.lock_timeout)
+                    } else {
+                        false
+                    };
+
+                    lock_pub.publish(&pipeline::Bool {
+                        data: has_lock
+                    }).unwrap();
+
+                    if opt.verbose {
+                        println!("Has lock: {}", has_lock);
+                    }
+                }
                 Some(msg) = cv_point3_rx.recv() => {
+                    last_seen = Some(std::time::Instant::now());
                     point_pub.publish(&msg).unwrap();
                     // TODO: publish point in vehicle frame
                 }
