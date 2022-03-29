@@ -26,7 +26,7 @@ struct Opt {
 
     /// Lock timeout in ms.
     /// Default: 1000.
-    #[structopt(short, long, default_value = "70")]
+    #[structopt(short, long, default_value = "1000")]
     lock_timeout: u64,
 }
 
