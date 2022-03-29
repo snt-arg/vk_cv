@@ -58,13 +58,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // main loop
     let _main_handle = tokio::task::spawn(async move {
         loop {
-            while let Ok(msg) = cv_point3_rx.try_recv() {
-                point_pub.publish(&msg).unwrap();
-                // TODO: publish point in vehicle frame
-            }
-            while let Ok(msg) = cv_image_rx.try_recv() {
-                image_pub.publish(&msg).unwrap();
-                // TODO: publish point in vehicle frame
+            tokio::select! {
+                Some(msg) = cv_point3_rx.recv() => {
+                    point_pub.publish(&msg).unwrap();
+                    // TODO: publish point in vehicle frame
+                }
+                Some(msg) = cv_image_rx.recv() => {
+                    image_pub.publish(&msg).unwrap();
+                }
             }
         }
     });
