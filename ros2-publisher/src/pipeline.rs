@@ -20,7 +20,8 @@ use vkcv::{
 };
 
 pub type Point3 = r2r::geometry_msgs::msg::Point;
-pub type RosImage = r2r::sensor_msgs::msg::Image;
+pub type Image = OwnedImage;
+pub type RosImageCompressed = r2r::sensor_msgs::msg::CompressedImage;
 
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -48,7 +49,7 @@ impl Default for Config {
 pub fn process_blocking(
     config: Config,
     sender_point3: UnboundedSender<Point3>,
-    sender_image: UnboundedSender<RosImage>,
+    sender_image: UnboundedSender<OwnedImage>,
 ) {
     println!("CV: Realsense camera tracker");
 
@@ -197,17 +198,7 @@ pub fn process_blocking(
 
         // send image
         if config.transmit_image {
-            let ros_img = RosImage {
-                header: Default::default(),
-                height: owned_image.info.height,
-                width: owned_image.info.width,
-                encoding: "rgba8".to_string(),
-                is_bigendian: 0,
-                step: owned_image.info.stride(),
-                data: owned_image.buffer,
-            };
-
-            sender_image.send(ros_img).unwrap();
+            sender_image.send(owned_image).unwrap();
         }
     }
 }

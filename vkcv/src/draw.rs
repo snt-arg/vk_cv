@@ -1,5 +1,6 @@
 use crate::utils::ImageInfo;
 
+#[derive(Debug)]
 pub struct OwnedImage {
     pub info: ImageInfo,
     pub buffer: Vec<u8>,
