@@ -39,10 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // publishers
     let point_pub =
-        node.create_publisher::<pipeline::Point3>("/camera_local_point", QosProfile::default())?;
+        node.create_publisher::<pipeline::Point3>("~/local_point", QosProfile::default())?;
 
     let image_pub = node.create_publisher::<pipeline::RosImageCompressed>(
-        "/camera_image/compressed",
+        "~/camera_image/compressed",
         QosProfile::default(),
     )?;
 
