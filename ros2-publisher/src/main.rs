@@ -74,6 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup jpeg compressor
     let mut compressor = Compressor::new()?;
     compressor.set_quality(opt.compressor_quality);
+    println!("Transmitting image: {}", opt.transmit_image);
 
     // heartbeat
     let mut lock_ticker = tokio::time::interval(std::time::Duration::from_millis(250));
