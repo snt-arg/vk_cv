@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use turbojpeg::{Compressor, Image, PixelFormat};
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "basic")]
+#[structopt(name = "ros2-publisher")]
 struct Opt {
     /// Be verbose
     #[structopt(short, long)]
@@ -20,12 +20,10 @@ struct Opt {
     transmit_image: bool,
 
     /// Compression quality.
-    /// Default: 70.
     #[structopt(short, long, default_value = "70")]
     compressor_quality: i32,
 
     /// Lock timeout in ms.
-    /// Default: 1000.
     #[structopt(short, long, default_value = "1000")]
     lock_timeout: u64,
 }
