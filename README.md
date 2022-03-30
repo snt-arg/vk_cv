@@ -39,6 +39,8 @@ cargo b --release
 the compiled executable is placed in `./target/release/ros2-publisher`.
 
 ```
+ros2-publisher 0.1.0
+
 USAGE:
     ros2-publisher [FLAGS] [OPTIONS]
 
@@ -50,8 +52,9 @@ FLAGS:
     -v, --verbose           Be verbose
 
 OPTIONS:
-    -c, --compressor-quality <compressor-quality>    Compression quality. Default: 70 [default: 70]
-    -l, --lock-timeout <lock-timeout>                Lock timeout in ms. Default: 1000 [default: 1000]
+    -c, --compressor-quality <compressor-quality>    Compression quality [default: 70]
+    -l, --lock-timeout <lock-timeout>                Lock timeout in ms [default: 1000]
+
 ```
 
 ## Changes
