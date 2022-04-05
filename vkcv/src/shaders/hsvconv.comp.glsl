@@ -2,7 +2,7 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 layout(set = 0, binding = 0, rgba8) uniform readonly image2D inputImage;
-layout(set = 0, binding = 1, rgba8) uniform image2D resultImage;
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D resultImage;
 
 const vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
 const float e = 1.0e-10;
