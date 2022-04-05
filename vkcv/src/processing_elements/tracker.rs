@@ -211,7 +211,7 @@ impl Tracker {
         )
         .unwrap();
 
-        let workgroups = utils::workgroups(&sub_dims, &[16, 16]);
+        let workgroups = utils::workgroups(&output_img.dimensions().width_height(), &[16, 16]);
 
         // build command buffer
         builder
