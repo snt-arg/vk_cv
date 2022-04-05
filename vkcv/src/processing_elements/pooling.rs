@@ -113,7 +113,7 @@ impl ProcessingElement for Pooling {
         IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img.clone()),
-            label: utils::label("Pooling", &output_img),
+            label: utils::basic_label("Pooling", &output_img),
         }
     }
 }

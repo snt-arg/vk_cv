@@ -500,7 +500,7 @@ impl ProcessingElement for Tracker {
 
         // canvas the input image to be a power of two
         // this is skipped if the input image is already a POT
-        let output_img = Self::canvas(
+        let output_img_canvas = Self::canvas(
             device.clone(),
             queue.clone(),
             builder,
@@ -509,21 +509,30 @@ impl ProcessingElement for Tracker {
         );
 
         // coordinate mask
-        let output_img = Self::coordinate_mask(
+        let output_img_cm = Self::coordinate_mask(
             device.clone(),
             queue.clone(),
             builder,
-            output_img.clone(),
+            output_img_canvas.clone(),
             &input_img.dimensions().width_height(),
         );
 
         // scale down to 1x1 px
-        let output_img = Self::pooling(device, queue, builder, output_img.clone(), self.pooling);
+        let output_img = Self::pooling(device, queue, builder, output_img_cm.clone(), self.pooling);
+
+        // create a descriptive label
+        let label = format!(
+            "Tracker\n\t- {}\n\t- {}\n\t- {}\n\t- {}\n\t",
+            utils::basic_label("Input", &input_img),
+            utils::basic_label("Canvas", &output_img_canvas),
+            utils::basic_label("Coordinate Mask", &output_img_cm),
+            utils::basic_label("Downscale", &output_img),
+        );
 
         IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img.clone()),
-            label: utils::label("Tracker", &output_img),
+            label,
         }
     }
 }

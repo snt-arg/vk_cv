@@ -320,9 +320,9 @@ impl DebugPipeline {
     }
 }
 
-pub fn label(name: &str, image: &StorageImage) -> String {
+pub fn basic_label(name: &str, image: &StorageImage) -> String {
     format!(
-        "{} ({}x{}:{})",
+        "{} ({}x{}:{}bits)",
         name,
         image.dimensions().width(),
         image.dimensions().height(),
