@@ -7,13 +7,14 @@ layout(set = 0, binding = 1, rgba32f) uniform image2D resultImage;
 layout(constant_id = 3) const float inv_width = 1.0;
 layout(constant_id = 4) const float inv_height = 1.0;
 
-void main() {
-  ivec2 id = ivec2(gl_GlobalInvocationID.xy);
-  const vec2 inv_size = vec2(inv_width, inv_height);
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    const vec2 inv_size = vec2(inv_width, inv_height);
 
-  // coordinate mask
-  float r = imageLoad(inputImage, id).r;
-  vec2 d = r * vec2(id) * inv_size;
+    // coordinate mask
+    float r = imageLoad(inputImage, id).r;
+    vec2 d = r * vec2(id) * inv_size;
 
-  imageStore(resultImage, id, vec4(d, r, r));
+    imageStore(resultImage, id, vec4(d, r, r));
 }

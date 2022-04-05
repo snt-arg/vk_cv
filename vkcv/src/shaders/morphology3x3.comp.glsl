@@ -17,36 +17,37 @@ layout(constant_id = 10) const float m33 = 1.0;
 
 layout(constant_id = 11) const int erode_dilate = 1;
 
-float op(in float a, in float b) {
-  if (erode_dilate == 0) {
-    return min(a, b);
-  } else {
-    return max(a, b);
-  }
+float op(in float a, in float b)
+{
+    if (erode_dilate == 0) {
+        return min(a, b);
+    } else {
+        return max(a, b);
+    }
 }
 
-void main() {
-  ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+void main()
+{
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 
-  float avg[9] =
-      float[](m11 * imageLoad(inputImage, ivec2(id.x - 1, id.y - 1)).r,
-              m12 * imageLoad(inputImage, ivec2(id.x - 1, id.y - 0)).r,
-              m13 * imageLoad(inputImage, ivec2(id.x - 1, id.y + 1)).r,
-              m21 * imageLoad(inputImage, ivec2(id.x - 0, id.y - 1)).r,
-              m22 * imageLoad(inputImage, ivec2(id.x - 0, id.y - 0)).r,
-              m23 * imageLoad(inputImage, ivec2(id.x - 0, id.y + 1)).r,
-              m31 * imageLoad(inputImage, ivec2(id.x + 1, id.y - 1)).r,
-              m32 * imageLoad(inputImage, ivec2(id.x + 1, id.y - 0)).r,
-              m33 * imageLoad(inputImage, ivec2(id.x + 1, id.y + 1)).r);
+    float avg[9] = float[](m11 * imageLoad(inputImage, ivec2(id.x - 1, id.y - 1)).r,
+        m12 * imageLoad(inputImage, ivec2(id.x - 1, id.y - 0)).r,
+        m13 * imageLoad(inputImage, ivec2(id.x - 1, id.y + 1)).r,
+        m21 * imageLoad(inputImage, ivec2(id.x - 0, id.y - 1)).r,
+        m22 * imageLoad(inputImage, ivec2(id.x - 0, id.y - 0)).r,
+        m23 * imageLoad(inputImage, ivec2(id.x - 0, id.y + 1)).r,
+        m31 * imageLoad(inputImage, ivec2(id.x + 1, id.y - 1)).r,
+        m32 * imageLoad(inputImage, ivec2(id.x + 1, id.y - 0)).r,
+        m33 * imageLoad(inputImage, ivec2(id.x + 1, id.y + 1)).r);
 
-  float res = op(avg[0], avg[1]);
-  res = op(res, avg[2]);
-  res = op(res, avg[3]);
-  res = op(res, avg[4]);
-  res = op(res, avg[5]);
-  res = op(res, avg[6]);
-  res = op(res, avg[7]);
-  res = op(res, avg[8]);
+    float res = op(avg[0], avg[1]);
+    res = op(res, avg[2]);
+    res = op(res, avg[3]);
+    res = op(res, avg[4]);
+    res = op(res, avg[5]);
+    res = op(res, avg[6]);
+    res = op(res, avg[7]);
+    res = op(res, avg[8]);
 
-  imageStore(resultImage, id, vec4(res));
+    imageStore(resultImage, id, vec4(res));
 }

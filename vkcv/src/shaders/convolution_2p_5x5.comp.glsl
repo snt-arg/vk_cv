@@ -13,41 +13,43 @@ layout(constant_id = 7) const float offset = 0.5;
 layout(constant_id = 8) const float denom = 2.0;
 layout(constant_id = 9) const int v_pass = 0;
 
-float conv(in float[5] data) {
-  float acc = m1 * data[0] + m2 * data[1] + m3 * data[2] //
-              + m4 * data[3] + m5 * data[4];
+float conv(in float[5] data)
+{
+    float acc = m1 * data[0] + m2 * data[1] + m3 * data[2] //
+        + m4 * data[3] + m5 * data[4];
 
-  return clamp(acc / denom + offset, 0.0, 1.0);
+    return clamp(acc / denom + offset, 0.0, 1.0);
 }
 
-void main() {
-  /*
-  Note:
-  - The compiler doesn't seem to unroll the loops
-  - Shared memory doesn't seem to improve performance
-  - Using push constants does not impact performance
-    (though does not optimize away 0 elements)
-  */
-  uvec2 id = gl_GlobalInvocationID.xy;
-  uvec2 lid = gl_LocalInvocationID.xy;
-  uvec2 wgid = gl_WorkGroupID.xy;
+void main()
+{
+    /*
+    Note:
+    - The compiler doesn't seem to unroll the loops
+    - Shared memory doesn't seem to improve performance
+    - Using push constants does not impact performance
+      (though does not optimize away 0 elements)
+    */
+    uvec2 id = gl_GlobalInvocationID.xy;
+    uvec2 lid = gl_LocalInvocationID.xy;
+    uvec2 wgid = gl_WorkGroupID.xy;
 
-  float avg[5];
-  if (v_pass == 0) {
-    avg[0] = imageLoad(inputImage, ivec2(id.x - 2, id.y)).r;
-    avg[1] = imageLoad(inputImage, ivec2(id.x - 1, id.y)).r;
-    avg[2] = imageLoad(inputImage, ivec2(id.x - 0, id.y)).r;
-    avg[3] = imageLoad(inputImage, ivec2(id.x + 1, id.y)).r;
-    avg[4] = imageLoad(inputImage, ivec2(id.x + 2, id.y)).r;
-  } else {
-    avg[0] = imageLoad(inputImage, ivec2(id.x, id.y - 2)).r;
-    avg[1] = imageLoad(inputImage, ivec2(id.x, id.y - 1)).r;
-    avg[2] = imageLoad(inputImage, ivec2(id.x, id.y - 0)).r;
-    avg[3] = imageLoad(inputImage, ivec2(id.x, id.y + 1)).r;
-    avg[4] = imageLoad(inputImage, ivec2(id.x, id.y + 2)).r;
-  }
+    float avg[5];
+    if (v_pass == 0) {
+        avg[0] = imageLoad(inputImage, ivec2(id.x - 2, id.y)).r;
+        avg[1] = imageLoad(inputImage, ivec2(id.x - 1, id.y)).r;
+        avg[2] = imageLoad(inputImage, ivec2(id.x - 0, id.y)).r;
+        avg[3] = imageLoad(inputImage, ivec2(id.x + 1, id.y)).r;
+        avg[4] = imageLoad(inputImage, ivec2(id.x + 2, id.y)).r;
+    } else {
+        avg[0] = imageLoad(inputImage, ivec2(id.x, id.y - 2)).r;
+        avg[1] = imageLoad(inputImage, ivec2(id.x, id.y - 1)).r;
+        avg[2] = imageLoad(inputImage, ivec2(id.x, id.y - 0)).r;
+        avg[3] = imageLoad(inputImage, ivec2(id.x, id.y + 1)).r;
+        avg[4] = imageLoad(inputImage, ivec2(id.x, id.y + 2)).r;
+    }
 
-  vec4 res = vec4(conv(avg));
+    vec4 res = vec4(conv(avg));
 
-  imageStore(resultImage, ivec2(id.xy), res);
+    imageStore(resultImage, ivec2(id.xy), res);
 }
