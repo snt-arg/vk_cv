@@ -3,5 +3,6 @@
 [workspace]
 members = [
     "vkcv",
+    "ros1-publisher",
     "ros2-publisher",
 ]
