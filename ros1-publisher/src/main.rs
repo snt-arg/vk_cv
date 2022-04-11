@@ -1,3 +1,4 @@
+mod msg;
 mod pipeline;
 
 use structopt::StructOpt;
@@ -36,15 +37,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ros setup
     rosrust::init("vkcv");
-    let rate = rosrust::rate(10.0);
 
     // publishers
-    let point_pub = rosrust::publish::<pipeline::Point3>("~/local_point", 1)?;
+    let point_pub = rosrust::publish::<pipeline::Point3>("/vkcv/local_point", 1)?;
 
     let image_pub =
-        rosrust::publish::<pipeline::RosImageCompressed>("~/camera_image/compressed", 1)?;
+        rosrust::publish::<pipeline::RosImageCompressed>("/vkcv/camera_image/compressed", 1)?;
 
-    let lock_pub = rosrust::publish::<pipeline::Bool>("~/lock", 1)?;
+    let lock_pub = rosrust::publish::<pipeline::Bool>("/vkcv/lock", 1)?;
+
+    println!("init");
 
     // setup vkcv
     let cv_config = pipeline::Config {
@@ -114,9 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // keep running (blocking)
-    while rosrust::is_ok() {
-        rate.sleep();
-    }
+    rosrust::spin();
 
     Ok(())
 }

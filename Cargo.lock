@@ -1455,7 +1455,6 @@ name = "ros1-publisher"
 version = "1.0.0"
 dependencies = [
  "rosrust",
- "rosrust_msg",
  "structopt",
  "tokio",
  "turbojpeg",
@@ -1528,15 +1527,6 @@ dependencies = [
  "quote",
  "ros_message",
  "syn",
-]
-
-[[package]]
-name = "rosrust_msg"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9023cf41d185f16406783324ef8a192f97efaaaa9d9e8c6ee52ae06712df47a4"
-dependencies = [
- "rosrust",
 ]
 
 [[package]]

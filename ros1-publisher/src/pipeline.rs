@@ -1,3 +1,4 @@
+use crate::msg;
 use vkcv::{
     draw::{draw_centroid, OwnedImage},
     endpoints::{image_download::ImageDownload, image_upload::ImageUpload},
@@ -19,10 +20,10 @@ use vkcv::{
     },
 };
 
-pub type Point3 = rosrust_msg::geometry_msgs::Point;
-pub type Bool = rosrust_msg::std_msgs::Bool;
+pub type Point3 = msg::geometry_msgs::Point;
+pub type Bool = msg::std_msgs::Bool;
 pub type Image = OwnedImage;
-pub type RosImageCompressed = rosrust_msg::sensor_msgs::CompressedImage;
+pub type RosImageCompressed = msg::sensor_msgs::CompressedImage;
 
 use tokio::sync::mpsc::UnboundedSender;
 
