@@ -25,6 +25,10 @@ struct Opt {
     /// Lock timeout in ms.
     #[structopt(short, long, default_value = "1000")]
     lock_timeout: u64,
+
+    /// Roslaunch may add some special args.
+    #[structopt(name = "__ros_args", default_value = "")]
+    _rargs: String,
 }
 
 #[tokio::main]
