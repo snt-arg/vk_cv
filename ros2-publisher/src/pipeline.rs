@@ -58,8 +58,13 @@ pub fn process_blocking(
     // std::env::set_var("DISPLAY", ":0");
     // std::env::set_var("V3D_DEBUG", "perf");
 
-    println!("CV: Opening camera...");
-    let mut camera = Realsense::open(&[640, 480], 30, &[640, 480], 30).unwrap();
+    let resolution = [640, 480];
+    let target_fps = 30;
+    println!(
+        "CV: Opening camera ({}x{}@{}fps)",
+        resolution[0], resolution[1], target_fps
+    );
+    let mut camera = Realsense::open(&resolution, target_fps, &resolution, target_fps).unwrap();
 
     // grab a couple of frames
     for _ in 0..5 {
@@ -77,7 +82,7 @@ pub fn process_blocking(
     let pe_hsv_filter = ColorFilter::new(config.hsv_min, config.hsv_max);
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_tracker = Tracker::new(PoolingStrategy::SampledPooling4, Canvas::Pad);
+    let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
     let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
     let pe_out = Output::new();
 
@@ -128,7 +133,7 @@ pub fn process_blocking(
     }
 
     println!(
-        "CV: Average duration: {} ms",
+        "CV: Average duration: {} ms/frame",
         avg_pipeline_execution_duration.as_millis()
     );
 

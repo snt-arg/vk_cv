@@ -109,7 +109,7 @@ impl ProcessingElement for Morphology {
         IoFragment {
             input: Io::Image(input_img),
             output: Io::Image(output_img.clone()),
-            label: utils::label("Morphology", &output_img),
+            label: utils::basic_label("Morphology", &output_img),
         }
     }
 }

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::{fs::File, io::BufWriter, path::Path};
 
@@ -82,16 +83,68 @@ pub fn load_image(image_path: &str) -> (ImageInfo, Vec<u8>) {
     )
 }
 
+pub fn convert_sfloat_to_unorm(width: u32, height: u32, data: &[u8]) -> Vec<u8> {
+    let mut conv_data = Vec::with_capacity((width * height * 4) as usize);
+    let bytes_per_pixel = 4 * 4; // rgba, f32
+    let stride = width * bytes_per_pixel;
+
+    let mut range = [f32::MIN_POSITIVE; 4];
+
+    for x in 0..width {
+        for y in 0..height {
+            let o = ((x * stride) + y * bytes_per_pixel) as usize;
+
+            let r = f32::from_le_bytes([data[o + 0], data[o + 1], data[o + 2], data[o + 3]]);
+            let g = f32::from_le_bytes([data[o + 4], data[o + 5], data[o + 6], data[o + 7]]);
+            let b = f32::from_le_bytes([data[o + 8], data[o + 9], data[o + 10], data[o + 11]]);
+            let a = f32::from_le_bytes([data[o + 12], data[o + 13], data[o + 14], data[o + 15]]);
+
+            range[0] = f32::max(range[0], r.abs());
+            range[1] = f32::max(range[1], g.abs());
+            range[2] = f32::max(range[2], b.abs());
+            range[3] = f32::max(range[3], a.abs());
+        }
+    }
+
+    for x in 0..width {
+        for y in 0..height {
+            let o = ((x * stride) + y * bytes_per_pixel) as usize;
+
+            let r = f32::from_le_bytes([data[o + 0], data[o + 1], data[o + 2], data[o + 3]]);
+            let g = f32::from_le_bytes([data[o + 4], data[o + 5], data[o + 6], data[o + 7]]);
+            let b = f32::from_le_bytes([data[o + 8], data[o + 9], data[o + 10], data[o + 11]]);
+            let a = f32::from_le_bytes([data[o + 12], data[o + 13], data[o + 14], data[o + 15]]);
+
+            conv_data.push((r.abs() / range[0] * 255.0) as u8);
+            conv_data.push((g.abs() / range[1] * 255.0) as u8);
+            conv_data.push((b.abs() / range[2] * 255.0) as u8);
+            conv_data.push((a.abs() / range[3] * 255.0) as u8);
+        }
+    }
+
+    conv_data
+}
+
 pub fn write_image(image_path: &str, data: &[u8], img_info: &ImageInfo) {
     let p = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), image_path);
     let path = Path::new(&p);
     let file = File::create(path).unwrap();
     let ref mut w = BufWriter::new(file);
     let mut encoder = png::Encoder::new(w, img_info.width, img_info.height);
+    let mut buffer = Cow::from(data);
 
     match img_info.format {
         Format::R8G8B8A8_UNORM => encoder.set_color(png::ColorType::Rgba),
         Format::R8_UNORM => encoder.set_color(png::ColorType::Grayscale),
+        Format::R32G32B32A32_SFLOAT => {
+            // conversion to UNROM required
+            encoder.set_color(png::ColorType::Rgba);
+            buffer = Cow::from(convert_sfloat_to_unorm(
+                img_info.width,
+                img_info.height,
+                data,
+            ));
+        }
         format => {
             println!("Cannot save format {:?}", format.type_color());
             return;
@@ -100,7 +153,7 @@ pub fn write_image(image_path: &str, data: &[u8], img_info: &ImageInfo) {
 
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header().unwrap();
-    writer.write_image_data(data).unwrap();
+    writer.write_image_data(&buffer).unwrap();
 }
 
 pub fn create_storage_image(
@@ -320,9 +373,9 @@ impl DebugPipeline {
     }
 }
 
-pub fn label(name: &str, image: &StorageImage) -> String {
+pub fn basic_label(name: &str, image: &StorageImage) -> String {
     format!(
-        "{} ({}x{}:{})",
+        "{} ({}x{}:{}bits)",
         name,
         image.dimensions().width(),
         image.dimensions().height(),

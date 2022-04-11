@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use turbojpeg::{Compressor, Image, PixelFormat};
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "basic")]
+#[structopt(name = "ros2-publisher")]
 struct Opt {
     /// Be verbose
     #[structopt(short, long)]
@@ -20,12 +20,10 @@ struct Opt {
     transmit_image: bool,
 
     /// Compression quality.
-    /// Default: 70.
     #[structopt(short, long, default_value = "70")]
     compressor_quality: i32,
 
     /// Lock timeout in ms.
-    /// Default: 1000.
     #[structopt(short, long, default_value = "1000")]
     lock_timeout: u64,
 }
@@ -74,6 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup jpeg compressor
     let mut compressor = Compressor::new()?;
     compressor.set_quality(opt.compressor_quality);
+    println!("Transmitting image: {}", opt.transmit_image);
 
     // heartbeat
     let mut lock_ticker = tokio::time::interval(std::time::Duration::from_millis(250));
