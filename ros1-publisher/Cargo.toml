@@ -9,5 +9,5 @@ edition = "2021"
 vkcv = { path = "../vkcv" }
 tokio = { version = "1.15.0", features = ["full"] }
 structopt = "0.3"
-turbojpeg = "0.3"
+turbojpeg = "0.4.2"
 rosrust = "0.9"
