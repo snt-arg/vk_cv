@@ -58,8 +58,13 @@ pub fn process_blocking(
     // std::env::set_var("DISPLAY", ":0");
     // std::env::set_var("V3D_DEBUG", "perf");
 
-    println!("CV: Opening camera...");
-    let mut camera = Realsense::open(&[640, 480], 30, &[640, 480], 30).unwrap();
+    let resolution = [640, 480];
+    let target_fps = 30;
+    println!(
+        "CV: Opening camera ({}x{}@{}fps)",
+        resolution[0], resolution[1], target_fps
+    );
+    let mut camera = Realsense::open(&resolution, target_fps, &resolution, target_fps).unwrap();
 
     // grab a couple of frames
     for _ in 0..5 {
