@@ -28,7 +28,7 @@ struct Opt {
 
     /// Roslaunch may add some special args.
     #[structopt(name = "__ros_args", default_value = "")]
-    _rargs: String,
+    _rargs: Vec<String>,
 }
 
 #[tokio::main]
