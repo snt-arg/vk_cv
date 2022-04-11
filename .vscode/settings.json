@@ -14,7 +14,14 @@
         "vulkano",
         "workgroups"
     ],
-    "ros.distro": "foxy",
-    "ros.rosSetupScript": "/opt/ros/foxy/setup.bash",
-    "ros.isolateEnvironment": false,
+    "ros.distro": "noetic",
+    "ros.isolateEnvironment": "true",
+    "python.autoComplete.extraPaths": [
+        "/home/paul/dev_ws/install/turtlesim/lib/python3.8/site-packages",
+        "/opt/ros/foxy/lib/python3.8/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/paul/dev_ws/install/turtlesim/lib/python3.8/site-packages",
+        "/opt/ros/foxy/lib/python3.8/site-packages"
+    ],
 }
