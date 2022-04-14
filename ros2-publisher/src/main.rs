@@ -23,6 +23,10 @@ struct Opt {
     #[structopt(short, long, default_value = "70")]
     compressor_quality: i32,
 
+    /// The smallest area in pixels required by the detector.
+    #[structopt(short, long, default_value = "110")]
+    min_area: u32,
+
     /// Lock timeout in ms.
     #[structopt(short, long, default_value = "1000")]
     lock_timeout: u64,
@@ -61,6 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cv_config = pipeline::Config {
         transmit_image: opt.transmit_image,
         verbose: opt.verbose,
+        min_area: opt.min_area,
         ..Default::default()
     };
 
