@@ -77,43 +77,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut last_seen = None;
 
         loop {
-            tokio::select! {
-                _ = lock_ticker.tick() => {
-                    let has_lock = if let Some(last_seen) = last_seen {
-                        std::time::Instant::now() - last_seen < std::time::Duration::from_millis(opt.lock_timeout)
-                    } else {
-                        false
-                    };
-
-                    lock_pub.send(pipeline::Bool {
-                        data: has_lock
-                    }).expect("Failed to send '~/lock'");
-
-                    if opt.verbose {
-                        println!("Has lock: {}", has_lock);
-                    }
-                },
-                Some(msg) = cv_point3_rx.recv() => {
-                    last_seen = Some(std::time::Instant::now());
-                    point_pub.send(msg).expect("Failed to send '~/local_point'");
-                    // TODO: publish point in vehicle frame
-                },
-                Some(image) = cv_image_rx.recv() => {
-                    let image = Image {
-                        pixels: image.buffer.as_slice(),
-                        width: image.info.width as usize,
-                        pitch: image.info.stride() as usize,
-                        height: image.info.height as usize,
-                        format: PixelFormat::RGBA,
-                    };
-                    if let Ok(jpeg_data) = compressor.compress_to_vec(image) {
-                        let ros_img_msg = pipeline::RosImageCompressed {
-                            format: "jpeg".to_string(),
-                            data: jpeg_data,
-                            ..Default::default()
+            if rosrust::is_ok() {
+                tokio::select! {
+                    _ = lock_ticker.tick() => {
+                        let has_lock = if let Some(last_seen) = last_seen {
+                            std::time::Instant::now() - last_seen < std::time::Duration::from_millis(opt.lock_timeout)
+                        } else {
+                            false
                         };
 
-                        image_pub.send(ros_img_msg).expect("Failed to send '~/camera_image/compressed'");
+                        lock_pub.send(pipeline::Bool {
+                            data: has_lock
+                        }).expect("Failed to send '~/lock'");
+
+                        if opt.verbose {
+                            println!("Has lock: {}", has_lock);
+                        }
+                    },
+                    Some(msg) = cv_point3_rx.recv() => {
+                        last_seen = Some(std::time::Instant::now());
+                        point_pub.send(msg).expect("Failed to send '~/local_point'");
+                        // TODO: publish point in vehicle frame
+                    },
+                    Some(image) = cv_image_rx.recv() => {
+                        let image = Image {
+                            pixels: image.buffer.as_slice(),
+                            width: image.info.width as usize,
+                            pitch: image.info.stride() as usize,
+                            height: image.info.height as usize,
+                            format: PixelFormat::RGBA,
+                        };
+                        if let Ok(jpeg_data) = compressor.compress_to_vec(image) {
+                            let ros_img_msg = pipeline::RosImageCompressed {
+                                format: "jpeg".to_string(),
+                                data: jpeg_data,
+                                ..Default::default()
+                            };
+
+                            image_pub.send(ros_img_msg).expect("Failed to send '~/camera_image/compressed'");
+                        }
                     }
                 }
             }
@@ -121,7 +123,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // keep running (blocking)
-    rosrust::spin();
+    let ros_handle = tokio::task::spawn_blocking(move || rosrust::spin());
+    ros_handle.await?;
 
     Ok(())
 }
