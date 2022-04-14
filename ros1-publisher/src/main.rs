@@ -26,7 +26,7 @@ struct Opt {
     #[structopt(short, long, default_value = "1000")]
     lock_timeout: u64,
 
-    /// The smallest area in pixels required by the detector.
+    /// The smallest area in pixels required by the detector. Smaller areas will be ignored.
     #[structopt(short, long, default_value = "110")]
     min_area: u32,
 

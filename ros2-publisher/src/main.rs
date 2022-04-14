@@ -23,7 +23,7 @@ struct Opt {
     #[structopt(short, long, default_value = "70")]
     compressor_quality: i32,
 
-    /// The smallest area in pixels required by the detector.
+    /// The smallest area in pixels required by the detector. Smaller areas will be ignored.
     #[structopt(short, long, default_value = "110")]
     min_area: u32,
 
