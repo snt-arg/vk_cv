@@ -40,11 +40,13 @@ fn main() -> Result<()> {
     //std::env::set_var("V3D_DEBUG", "perf");
 
     // depth resolutions
-    // 640x480
-    // 480x270
-    let mut camera = Realsense::open(&[640, 480], 60, &[640, 480], 60).unwrap();
+    //let res = [848, 480];
+    let res = [640, 480];
+    //let res = [480, 270];
+    let fps = 30;
+    let mut camera = Realsense::open(&res, fps, &res, fps).unwrap();
 
-    camera.dump_intrinsic(Some((640, 480)));
+    // camera.dump_intrinsic(Some((640, 480)));
 
     // grab a couple of frames
     for _ in 0..5 {
