@@ -1,4 +1,8 @@
-use std::{ffi::c_void, ops::Deref, ptr};
+use std::{
+    ffi::{c_void, CStr},
+    ops::Deref,
+    ptr,
+};
 
 use realsense_sys::*;
 use vulkano::format::Format::R8G8B8A8_UNORM;
@@ -260,6 +264,62 @@ impl Realsense {
             );
 
             point
+        }
+    }
+
+    pub fn dump_intrinsic(&self, res: Option<(i32, i32)>) {
+        println!("Dump intrinsics");
+        unsafe {
+            let mut err = ptr::null_mut();
+
+            let sensor_list = rs2_query_sensors(self.dev, &mut err);
+            panic_err(err);
+
+            let sensor_count = rs2_get_sensors_count(sensor_list, &mut err);
+            panic_err(err);
+
+            for i in 0..sensor_count {
+                let sensor = rs2_create_sensor(sensor_list, i, &mut err);
+                panic_err(err);
+
+                let profile_list = rs2_get_stream_profiles(sensor, &mut err);
+                panic_err(err);
+
+                let profile_count = rs2_get_stream_profiles_count(profile_list, &mut err);
+                panic_err(err);
+
+                let name =
+                    rs2_get_sensor_info(sensor, rs2_camera_info_RS2_CAMERA_INFO_NAME, &mut err);
+                panic_err(err);
+
+                println!("Sensor name: {:?}", CStr::from_ptr(name));
+
+                for p in 0..profile_count {
+                    let stream_profile = rs2_get_stream_profile(profile_list, p, &mut err);
+                    panic_err(err);
+
+                    let mut video_intrinsics = std::mem::zeroed::<rs2_intrinsics>();
+                    rs2_get_video_stream_intrinsics(
+                        stream_profile,
+                        &mut video_intrinsics,
+                        &mut err,
+                    );
+                    panic_err(err);
+
+                    if let Some((width, height)) = res {
+                        if video_intrinsics.width == width && video_intrinsics.height == height {
+                            dbg!(video_intrinsics);
+                        }
+                    } else {
+                        dbg!(video_intrinsics);
+                    }
+                }
+
+                rs2_delete_stream_profiles_list(profile_list);
+                rs2_delete_sensor(sensor);
+            }
+
+            rs2_delete_sensor_list(sensor_list);
         }
     }
 }

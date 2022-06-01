@@ -36,13 +36,15 @@ fn main() -> Result<()> {
     println!("Realsense camera tracker");
 
     // set the default display, otherwise we fallback to llvmpipe
-    std::env::set_var("DISPLAY", ":0");
-    std::env::set_var("V3D_DEBUG", "perf");
+    //std::env::set_var("DISPLAY", ":0");
+    //std::env::set_var("V3D_DEBUG", "perf");
 
     // depth resolutions
     // 640x480
     // 480x270
-    let mut camera = Realsense::open(&[640, 480], 30, &[640, 480], 30).unwrap();
+    let mut camera = Realsense::open(&[640, 480], 60, &[640, 480], 60).unwrap();
+
+    camera.dump_intrinsic(Some((640, 480)));
 
     // grab a couple of frames
     for _ in 0..5 {
