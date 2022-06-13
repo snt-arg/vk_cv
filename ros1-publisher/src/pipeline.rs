@@ -87,7 +87,7 @@ pub fn process_blocking(
     let pe_hsv_filter = ColorFilter::new(config.hsv_min, config.hsv_max);
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_tracker = Tracker::new(PoolingStrategy::SampledPooling4, Canvas::Pad);
+    let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
     let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
     let pe_out = Output::new();
 

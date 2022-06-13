@@ -29,6 +29,10 @@ struct Opt {
     #[structopt(short, long, default_value = "1000")]
     lock_timeout: u64,
 
+    /// The smallest area in pixels required by the detector. Smaller areas will be ignored.
+    #[structopt(short, long, default_value = "110")]
+    min_area: u32,
+
     /// Roslaunch adds some special args
     /// e.g. __name:=... __log:=...
     #[structopt(name = "__ros_args", default_value = "")]
@@ -60,6 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cv_config = pipeline::Config {
         transmit_image: opt.transmit_image,
         verbose: opt.verbose,
+        min_area: opt.min_area,
         ..Default::default()
     };
 
@@ -136,7 +141,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // keep running (blocking)
-    rosrust::spin();
+    let ros_handle = tokio::task::spawn_blocking(move || rosrust::spin());
+    ros_handle.await?;
 
     println!("exit ros node");
 

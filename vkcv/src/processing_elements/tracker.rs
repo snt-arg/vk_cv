@@ -1,3 +1,4 @@
+use half::f16;
 use std::sync::Arc;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
@@ -194,7 +195,7 @@ impl Tracker {
         let output_img = utils::create_storage_image(
             device.clone(),
             queue.clone(),
-            &ImageInfo::from_image(&input_img, Format::R32G32B32A32_SFLOAT),
+            &ImageInfo::from_image(&input_img, Format::R16G16B16A16_SFLOAT),
         );
 
         // setup layout
@@ -330,7 +331,7 @@ impl Tracker {
             device.clone(),
             queue.clone(),
             &ImageInfo {
-                format: Format::R32G32B32A32_SFLOAT,
+                format: Format::R16G16B16A16_SFLOAT,
                 height: out_size,
                 width: out_size,
             },
@@ -432,7 +433,7 @@ impl Tracker {
             device.clone(),
             queue.clone(),
             &ImageInfo {
-                format: Format::R32G32B32A32_SFLOAT,
+                format: Format::R16G16B16A16_SFLOAT,
                 height: out_size,
                 width: out_size,
             },
@@ -540,14 +541,25 @@ impl ProcessingElement for Tracker {
 pub fn centroid(tf_img: &TransferredImage) -> ([f32; 2], f32) {
     assert_eq!(tf_img.info().width, 1);
     assert_eq!(tf_img.info().height, 1);
-    assert_eq!(tf_img.info().format, Format::R32G32B32A32_SFLOAT);
 
     let buffer = tf_img.buffer_content();
-    let x = f32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
-    let y = f32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
-    let z = f32::from_le_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]);
 
-    ([x / z, y / z], z)
+    match tf_img.info().format {
+        Format::R16G16B16A16_SFLOAT => {
+            let x = f16::from_le_bytes([buffer[0], buffer[1]]).to_f32();
+            let y = f16::from_le_bytes([buffer[2], buffer[3]]).to_f32();
+            let z = f16::from_le_bytes([buffer[4], buffer[5]]).to_f32();
+
+            ([x / z, y / z], z)
+        }
+        Format::R32G32B32A32_SFLOAT => {
+            let x = f32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
+            let y = f32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
+            let z = f32::from_le_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]);
+            ([x / z, y / z], z)
+        }
+        _ => ([f32::NAN, f32::NAN], f32::NAN),
+    }
 }
 
 #[cfg(test)]
