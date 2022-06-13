@@ -1,9 +1,12 @@
 mod msg;
 mod pipeline;
 
+use std::process::exit;
+
 use structopt::StructOpt;
-use tokio::sync::mpsc;
+use tokio::{signal, sync::mpsc};
 use turbojpeg::{Compressor, Image, PixelFormat};
+use vkcv::realsense::Realsense;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "ros1-publisher")]
@@ -51,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let lock_pub = rosrust::publish::<pipeline::Bool>("/vkcv/lock", 1)?;
 
-    println!("init");
+    let (mut exit_tx, exit_rx) = std::sync::mpsc::channel();
 
     // setup vkcv
     let cv_config = pipeline::Config {
@@ -62,7 +65,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // vkcv processing thread
     let _vkcv_handle = tokio::task::spawn_blocking(move || {
-        pipeline::process_blocking(cv_config, cv_point3_tx, cv_image_tx);
+        match pipeline::process_blocking(cv_config, cv_point3_tx, cv_image_tx, exit_rx) {
+            Err(_) => println!("Cannot open camera"),
+            _ => (),
+        }
     });
 
     // setup jpeg compressor
@@ -73,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lock_ticker = tokio::time::interval(std::time::Duration::from_millis(250));
 
     // publishing thread
-    let _main_handle = tokio::task::spawn(async move {
+    let main_handle = tokio::task::spawn(async move {
         let mut last_seen = None;
 
         loop {
@@ -91,6 +97,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     if opt.verbose {
                         println!("Has lock: {}", has_lock);
+                    }
+
+                    if !rosrust::is_ok() {
+                        return;
                     }
                 },
                 Some(msg) = cv_point3_rx.recv() => {
@@ -116,12 +126,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         image_pub.send(ros_img_msg).expect("Failed to send '~/camera_image/compressed'");
                     }
                 }
+                Ok(_) = signal::ctrl_c() => {
+                    exit_tx.send(true).unwrap();
+                    return; // exit thread
+                }
+
             }
         }
     });
 
     // keep running (blocking)
     rosrust::spin();
+
+    println!("exit ros node");
 
     Ok(())
 }

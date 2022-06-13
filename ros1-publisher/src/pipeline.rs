@@ -1,3 +1,5 @@
+use std::sync::mpsc::Receiver;
+
 use crate::msg;
 use vkcv::{
     draw::{draw_centroid, OwnedImage},
@@ -52,7 +54,8 @@ pub fn process_blocking(
     config: Config,
     sender_point3: UnboundedSender<Point3>,
     sender_image: UnboundedSender<OwnedImage>,
-) {
+    exit_signal: Receiver<bool>,
+) -> anyhow::Result<()> {
     println!("CV: Realsense camera tracker");
 
     // set the default display, otherwise we fallback to llvmpipe
@@ -65,7 +68,8 @@ pub fn process_blocking(
         "CV: Opening camera ({}x{}@{}fps)",
         resolution[0], resolution[1], target_fps
     );
-    let mut camera = Realsense::open(&resolution, target_fps, &resolution, target_fps).unwrap();
+    let mut camera = Realsense::open(&resolution, target_fps, &resolution, target_fps)
+        .map_err(anyhow::Error::msg)?;
 
     // grab a couple of frames
     for _ in 0..5 {
@@ -193,19 +197,30 @@ pub fn process_blocking(
             if let Some(depth) = depth {
                 let point = camera.deproject_pixel(&pixel_coords, depth, &color_image);
 
-                sender_point3
-                    .send(Point3 {
-                        x: point[0] as f64,
-                        y: point[1] as f64,
-                        z: point[2] as f64,
-                    })
-                    .unwrap();
+                if rosrust::is_ok() {
+                    sender_point3
+                        .send(Point3 {
+                            x: point[0] as f64,
+                            y: point[1] as f64,
+                            z: point[2] as f64,
+                        })
+                        .unwrap();
+                }
             }
         }
 
         // send image
         if config.transmit_image {
-            sender_image.send(owned_image).unwrap();
+            if rosrust::is_ok() {
+                sender_image
+                    .send(owned_image)
+                    .expect("Failed to transmit image");
+            }
+        }
+
+        if let Ok(_) = exit_signal.try_recv() {
+            println!("exit camera thread");
+            return Ok(());
         }
     }
 }

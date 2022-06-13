@@ -1454,6 +1454,7 @@ checksum = "8c31b5c4033f8fdde8700e4657be2c497e7288f01515be52168c631e2e4d4086"
 name = "ros1-publisher"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "rosrust",
  "structopt",
  "tokio",
