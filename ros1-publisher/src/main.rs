@@ -1,12 +1,9 @@
 mod msg;
 mod pipeline;
 
-use std::process::exit;
-
 use structopt::StructOpt;
 use tokio::{signal, sync::mpsc};
 use turbojpeg::{Compressor, Image, PixelFormat};
-use vkcv::realsense::Realsense;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "ros1-publisher")]
@@ -58,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let lock_pub = rosrust::publish::<pipeline::Bool>("/vkcv/lock", 1)?;
 
-    let (mut exit_tx, exit_rx) = std::sync::mpsc::channel();
+    let (exit_tx, exit_rx) = std::sync::mpsc::channel();
 
     // setup vkcv
     let cv_config = pipeline::Config {
@@ -141,8 +138,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // keep running (blocking)
-    let ros_handle = tokio::task::spawn_blocking(move || rosrust::spin());
-    ros_handle.await?;
+    rosrust::spin();
+    main_handle.await?;
 
     println!("exit ros node");
 
