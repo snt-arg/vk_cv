@@ -36,6 +36,7 @@ pub struct Config {
     pub min_area: u32,
     pub transmit_image: bool,
     pub transmit_depth_image: bool,
+    pub process_image: bool,
     pub verbose: bool,
 }
 
@@ -44,9 +45,10 @@ impl Default for Config {
         Self {
             hsv_min: [0.3, 0.6, 0.239],
             hsv_max: [0.5, 1.0, 1.0],
-            min_area: 4*4,
+            min_area: 4 * 4,
             transmit_image: false,
             transmit_depth_image: false,
+            process_image: true,
             verbose: false,
         }
     }
@@ -194,7 +196,9 @@ pub fn process_blocking(
             }
 
             // draw centroid
-            draw_centroid(&mut owned_image, &pixel_coords);
+            if config.process_image {
+                draw_centroid(&mut owned_image, &pixel_coords);
+            }
 
             // de-project to obtain a 3D point in camera coordinates
             if let Some(depth) = depth {

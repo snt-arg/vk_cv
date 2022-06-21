@@ -22,9 +22,9 @@ struct Opt {
     #[structopt(long)]
     transmit_depth_image: bool,
 
-    /// Transmit unprocessed color image.
+    /// Transmit unprocessed (yet compressed) color image.
     #[structopt(long)]
-    image_is_unprocessed: bool,
+    raw_color_image: bool,
 
     /// Compression quality.
     #[structopt(short, long, default_value = "60")]
@@ -73,6 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cv_config = pipeline::Config {
         transmit_image: opt.transmit_image,
         transmit_depth_image: opt.transmit_depth_image,
+        process_image: !opt.raw_color_image,
         verbose: opt.verbose,
         min_area: opt.min_area,
         ..Default::default()
@@ -80,7 +81,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // vkcv processing thread
     let vkcv_handle = tokio::task::spawn_blocking(move || {
-        match pipeline::process_blocking(cv_config, cv_point3_tx, cv_image_tx, cv_depth_image_tx, exit_rx) {
+        match pipeline::process_blocking(
+            cv_config,
+            cv_point3_tx,
+            cv_image_tx,
+            cv_depth_image_tx,
+            exit_rx,
+        ) {
             Err(_) => println!("Cannot open camera"),
             _ => (),
         }
