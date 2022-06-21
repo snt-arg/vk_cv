@@ -39,25 +39,38 @@ cargo b --release
 the compiled executable is placed in `./target/release/ros2-publisher`.
 
 ```
-ros2-publisher 0.1.0
+ros1-publisher 1.0.0
 
 USAGE:
-    ros2-publisher [FLAGS] [OPTIONS]
+    ros1-publisher [FLAGS] [OPTIONS] [__ros_args]...
 
 FLAGS:
-    -h, --help              Prints help information
-    -t, --transmit-image    Transmits the camera image with a crosshair. Images are compressed via libjpegturbo.
-                            WARNING: This may generate a lot of data!
-    -V, --version           Prints version information
-    -v, --verbose           Be verbose
+    -h, --help                    Prints help information
+        --raw-color-image         Transmit unprocessed (yet compressed) color image
+        --transmit-depth-image    Transmit depth image
+    -t, --transmit-image          Transmits the camera image with a crosshair. Images are compressed via libjpegturbo.
+                                  WARNING: This may generate a lot of data!
+    -V, --version                 Prints version information
+    -v, --verbose                 Be verbose
 
 OPTIONS:
-    -c, --compressor-quality <compressor-quality>    Compression quality [default: 70]
+    -c, --compressor-quality <compressor-quality>    Compression quality [default: 60]
     -l, --lock-timeout <lock-timeout>                Lock timeout in ms [default: 1000]
+    -m, --min-area <min-area>
+            The smallest area in pixels required by the detector. Smaller areas will be ignored [default: 110]
 
+
+ARGS:
+    <__ros_args>...    Roslaunch adds some special args e.g. __name:=... __log:=... [default: ]
 ```
 
 ## Changes
+
+### Version 0.3
+
+* Improved: ROS1 & ROS2 integration
+* Added: Hole fill filter
+* Added: Transmit compressed depth image
 
 ### Version 0.2
 
