@@ -50,10 +50,10 @@ fn main() -> Result<()> {
 
     // grab a couple of frames
     for _ in 0..5 {
-        camera.fetch_image();
+        camera.fetch_image(false);
     }
 
-    let img_info = camera.fetch_image().0.image_info();
+    let img_info = camera.fetch_image(false).0.image_info();
 
     // init device
     let (device, queue) = vk_init::init();
@@ -124,7 +124,7 @@ fn main() -> Result<()> {
 
     loop {
         // grab depth and color image from the realsense
-        let (color_image, depth_image) = camera.fetch_image();
+        let (color_image, depth_image) = camera.fetch_image(true);
 
         // time
         let pipeline_started = std::time::Instant::now();

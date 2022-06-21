@@ -31,6 +31,8 @@ pub struct Realsense {
     pipe: *mut rs2_pipeline,
     profile: *mut rs2_pipeline_profile,
     dev: *mut rs2_device,
+    hole_filter: *mut rs2_processing_block,
+    frame_queue: *mut rs2_frame_queue,
 
     depth_scale: f32,
 }
@@ -115,6 +117,14 @@ impl Realsense {
             let profile = rs2_pipeline_start_with_config(pipe, config, &mut err);
             check_err(err)?;
 
+            // hole filter
+            let hole_filter = rs2_create_hole_filling_filter_block(&mut err);
+            check_err(err)?;
+            let frame_queue = rs2_create_frame_queue(1, &mut err);
+            check_err(err)?;
+            rs2_start_processing_queue(hole_filter, frame_queue, &mut err);
+            check_err(err)?;
+
             Ok(Realsense {
                 ctx,
                 config,
@@ -122,11 +132,13 @@ impl Realsense {
                 profile,
                 dev,
                 depth_scale,
+                hole_filter,
+                frame_queue,
             })
         }
     }
 
-    pub fn fetch_image(&mut self) -> (ColorFrame, DepthFrame) {
+    pub fn fetch_image(&mut self, apply_hole_filter: bool) -> (ColorFrame, DepthFrame) {
         let mut color_frame = Frame {
             frame: ptr::null_mut(),
         };
@@ -143,7 +155,7 @@ impl Realsense {
             panic_err(err);
 
             for i in 0..frames_count {
-                let frame_ptr = rs2_extract_frame(composite, i, &mut err);
+                let mut frame_ptr = rs2_extract_frame(composite, i, &mut err);
                 panic_err(err);
 
                 // depth frame
@@ -153,6 +165,16 @@ impl Realsense {
                     &mut err,
                 ) > 0
                 {
+                    if apply_hole_filter {
+                        rs2_frame_add_ref(frame_ptr, &mut err);
+                        panic_err(err);
+                        rs2_process_frame(self.hole_filter, frame_ptr, &mut err);
+                        let processed_frame = rs2_wait_for_frame(self.frame_queue, 1000, &mut err);
+                        panic_err(err);
+                        rs2_release_frame(frame_ptr);
+                        frame_ptr = processed_frame;
+                    }
+
                     depth_frame.frame = frame_ptr;
                 }
 

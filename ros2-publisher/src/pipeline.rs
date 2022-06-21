@@ -68,10 +68,10 @@ pub fn process_blocking(
 
     // grab a couple of frames
     for _ in 0..5 {
-        camera.fetch_image();
+        camera.fetch_image(false);
     }
 
-    let img_info = camera.fetch_image().0.image_info();
+    let img_info = camera.fetch_image(false).0.image_info();
 
     // init device
     let (device, queue) = vk_init::init();
@@ -140,7 +140,7 @@ pub fn process_blocking(
     println!("CV: Entering main loop");
     loop {
         // grab depth and color image from the realsense
-        let (color_image, depth_image) = camera.fetch_image();
+        let (color_image, depth_image) = camera.fetch_image(true);
 
         // upload image to GPU
         upload.copy_input_data(color_image.data_slice());
