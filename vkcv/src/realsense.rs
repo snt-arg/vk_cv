@@ -347,6 +347,46 @@ impl Deref for DepthFrame {
     }
 }
 
+impl DepthFrame {
+    pub fn to_owned_rgb(&self) -> Vec<u8> {
+        let data = self.data_slice();
+        let mut conv_data = vec![0; self.width() as usize *self.height() as usize *3];
+
+        for x in 0..self.width() as usize {
+            for y in 0..self.height() as usize {
+                let s = self.stride() as usize;
+                let depth = (data[x*2+1 + y*s] as u16) << 8 | data[x*2 + y*s] as u16;
+                //let depth_u8 = (depth as u32 * u8::MAX as u32 / u16::MAX as u32) as u8;
+                let depth_u8 = (depth as u32 * u8::MAX as u32 / 8192) as u8;
+ 
+                let s = self.width() as usize * 3;
+                conv_data[(x*3+0) + y*s] = depth_u8;
+                conv_data[(x*3+1) + y*s] = depth_u8;
+                conv_data[(x*3+2) + y*s] = depth_u8;
+            }
+        }
+
+        conv_data
+    }
+
+    pub fn to_owned_depth_u8(&self) -> Vec<u8> {
+        let data = self.data_slice();
+        let mut conv_data = vec![0; self.width() as usize * self.height() as usize];
+
+        for x in 0..self.width() as usize {
+            for y in 0..self.height() as usize {
+                let s = self.stride() as usize;
+                let depth = (data[x + y*s] as u16) << 8 | data[(x+1) + y*s] as u16;
+                let depth_u8 = (depth as u32 * u8::MAX as u32 / u16::MAX as u32) as u8;
+ 
+                conv_data[x + y * self.width() as usize] = depth_u8;
+            }
+        }
+
+        conv_data
+    }
+}
+
 pub struct ColorFrame(Frame);
 
 impl Deref for ColorFrame {

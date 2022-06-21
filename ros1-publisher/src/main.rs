@@ -18,8 +18,16 @@ struct Opt {
     #[structopt(short, long)]
     transmit_image: bool,
 
+    /// Transmit depth image.
+    #[structopt(long)]
+    transmit_depth_image: bool,
+
+    /// Transmit unprocessed color image.
+    #[structopt(long)]
+    image_is_unprocessed: bool,
+
     /// Compression quality.
-    #[structopt(short, long, default_value = "70")]
+    #[structopt(short, long, default_value = "60")]
     compressor_quality: i32,
 
     /// Lock timeout in ms.
@@ -43,6 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // mpsc
     let (cv_point3_tx, mut cv_point3_rx) = mpsc::unbounded_channel::<pipeline::Point3>();
     let (cv_image_tx, mut cv_image_rx) = mpsc::unbounded_channel::<pipeline::Image>();
+    let (cv_depth_image_tx, mut cv_depth_image_rx) = mpsc::unbounded_channel::<pipeline::Image>();
 
     // ros setup
     rosrust::init("vkcv");
@@ -53,6 +62,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image_pub =
         rosrust::publish::<pipeline::RosImageCompressed>("/vkcv/camera_image/compressed", 1)?;
 
+    let depth_image_pub =
+        rosrust::publish::<pipeline::RosImageCompressed>("/vkcv/camera_depth_image/compressed", 1)?;
+
     let lock_pub = rosrust::publish::<pipeline::Bool>("/vkcv/lock", 1)?;
 
     let (exit_tx, exit_rx) = std::sync::mpsc::channel();
@@ -60,6 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // setup vkcv
     let cv_config = pipeline::Config {
         transmit_image: opt.transmit_image,
+        transmit_depth_image: opt.transmit_depth_image,
         verbose: opt.verbose,
         min_area: opt.min_area,
         ..Default::default()
@@ -67,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // vkcv processing thread
     let vkcv_handle = tokio::task::spawn_blocking(move || {
-        match pipeline::process_blocking(cv_config, cv_point3_tx, cv_image_tx, exit_rx) {
+        match pipeline::process_blocking(cv_config, cv_point3_tx, cv_image_tx, cv_depth_image_tx, exit_rx) {
             Err(_) => println!("Cannot open camera"),
             _ => (),
         }
@@ -127,6 +140,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         };
 
                         image_pub.send(ros_img_msg).expect("Failed to send '~/camera_image/compressed'");
+                    }
+                }
+                Some(image) = cv_depth_image_rx.recv() => {
+                    let image = Image {
+                        pixels: image.buffer.as_slice(),
+                        width: image.info.width as usize,
+                        pitch: image.info.stride() as usize,
+                        height: image.info.height as usize,
+                        format: PixelFormat::RGB,
+                    };
+
+                    if let Ok(jpeg_data) = compressor.compress_to_vec(image) {
+                        let ros_img_msg = pipeline::RosImageCompressed {
+                            format: "jpeg".to_string(),
+                            data: jpeg_data,
+                            ..Default::default()
+                        };
+                        depth_image_pub.send(ros_img_msg).expect("Failed to send '~/camera_depth_image/compressed'");
                     }
                 }
                 Ok(_) = signal::ctrl_c() => {

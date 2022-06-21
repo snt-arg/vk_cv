@@ -35,6 +35,7 @@ pub struct Config {
     pub hsv_max: [f32; 3],
     pub min_area: u32,
     pub transmit_image: bool,
+    pub transmit_depth_image: bool,
     pub verbose: bool,
 }
 
@@ -45,6 +46,7 @@ impl Default for Config {
             hsv_max: [0.5, 1.0, 1.0],
             min_area: 4*4,
             transmit_image: false,
+            transmit_depth_image: false,
             verbose: false,
         }
     }
@@ -54,6 +56,7 @@ pub fn process_blocking(
     config: Config,
     sender_point3: UnboundedSender<Point3>,
     sender_image: UnboundedSender<OwnedImage>,
+    sender_depth_image: UnboundedSender<OwnedImage>,
     exit_signal: Receiver<bool>,
 ) -> anyhow::Result<()> {
     println!("CV: Realsense camera tracker");
@@ -213,6 +216,25 @@ pub fn process_blocking(
         if config.transmit_image {
             if rosrust::is_ok() {
                 sender_image
+                    .send(owned_image)
+                    .expect("Failed to transmit image");
+            }
+        }
+
+        // send depth image
+        if config.transmit_depth_image {
+            // convert from monochrome to rgb format
+            let owned_image = OwnedImage {
+                buffer: depth_image.to_owned_rgb(),
+                info: ImageInfo {
+                    width: depth_image.width(),
+                    height: depth_image.height(),
+                    format: vulkano::format::Format::R8G8B8_UINT,
+                },
+            };
+
+            if rosrust::is_ok() {
+                sender_depth_image
                     .send(owned_image)
                     .expect("Failed to transmit image");
             }
