@@ -43,7 +43,7 @@ impl Default for Config {
         Self {
             hsv_min: [0.3, 0.6, 0.239],
             hsv_max: [0.5, 1.0, 1.0],
-            min_area: 50,
+            min_area: 4*4,
             transmit_image: false,
             verbose: false,
         }

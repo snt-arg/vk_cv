@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     std::env::set_var("DISPLAY", ":0");
     std::env::set_var("V3D_DEBUG", "perf");
 
-    let (img_info, img_data) = load_image("tracking_1.png");
+    let (img_info, img_data) = load_image("lab_image_2_rgba.png");
 
     // init device
     let (device, queue) = vk_init::init();
@@ -42,7 +42,7 @@ fn main() -> Result<()> {
     let pe_gsc = Grayscale::new();
 
     let pe_hsv = Hsvconv::new();
-    let pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
+    let pe_hsv_filter = ColorFilter::new([0.3, 0.6, 0.239], [0.5, 1.0, 1.0]);
     let pe_pooling = Pooling::new(pooling::Operation::Max);
     // let pe_conv = Convolution::new(device.clone(), queue.clone(), &pe_hsv_filter);
     // let pe_conv_2p = Convolution2Pass::new(device.clone(), queue.clone(), &pe_gsc);
