@@ -204,7 +204,8 @@ pub fn process_blocking(
             if let Some(depth) = depth {
                 let point = camera.deproject_pixel(&pixel_coords, depth, &color_image);
 
-                if rosrust::is_ok() {
+                // ignore this measurement if we hit a hole in the depth image
+                if point[2] > 0.0 && rosrust::is_ok() {
                     sender_point3
                         .send(Point3 {
                             x: point[0] as f64,
