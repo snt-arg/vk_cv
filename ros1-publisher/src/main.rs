@@ -66,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // vkcv processing thread
-    let _vkcv_handle = tokio::task::spawn_blocking(move || {
+    let vkcv_handle = tokio::task::spawn_blocking(move || {
         match pipeline::process_blocking(cv_config, cv_point3_tx, cv_image_tx, exit_rx) {
             Err(_) => println!("Cannot open camera"),
             _ => (),
@@ -81,6 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lock_ticker = tokio::time::interval(std::time::Duration::from_millis(250));
 
     // publishing thread
+    let exit_tx_main = exit_tx.clone();
     let main_handle = tokio::task::spawn(async move {
         let mut last_seen = None;
 
@@ -129,19 +130,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Ok(_) = signal::ctrl_c() => {
-                    exit_tx.send(true).unwrap();
+                    exit_tx_main.send(true).unwrap();
                     return; // exit thread
                 }
-
             }
         }
     });
 
     // keep running (blocking)
     rosrust::spin();
-    main_handle.await?;
-
-    println!("exit ros node");
+    println!("exit ros node, wait for threads to finish...");
+    exit_tx.send(true).unwrap();
+    tokio::join!(main_handle, vkcv_handle);
+    println!("exit threads");
 
     Ok(())
 }
