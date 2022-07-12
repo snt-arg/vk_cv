@@ -179,7 +179,7 @@ fn main() -> Result<()> {
         }
 
         // get the depth only if our object is bigger than 225px² (15x15)
-        if area_px > 225 {
+        if area_px > 16 {
             let pixel_coords = [
                 c[0] * color_image.width() as f32,
                 c[1] * color_image.height() as f32,
@@ -189,9 +189,12 @@ fn main() -> Result<()> {
             // de-project to obtain a 3D point in camera coordinates
             if let Some(depth) = depth {
                 let point = camera.deproject_pixel(&pixel_coords, depth, &color_image);
-                dbg!(point);
+                println!(
+                    "[{}] Target located at: [{:.2},{:.2},{:.2}] ({} px²)",
+                    frame, point[0], point[1], point[2], area_px,
+                );
             }
-            dbg!(c);
+            //dbg!(c);
 
             // paint the centroid
             if DBG_PROFILE && frame % 15 == 0 {
