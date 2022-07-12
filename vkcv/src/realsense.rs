@@ -1,7 +1,7 @@
 use std::{
     ffi::{c_void, CStr},
     ops::Deref,
-    ptr,
+    ptr::{self},
 };
 
 use realsense_sys::*;
@@ -138,11 +138,12 @@ impl Realsense {
         }
     }
 
-    pub fn fetch_image(&mut self, apply_hole_filter: bool) -> (ColorFrame, DepthFrame) {
+    pub fn fetch_image(&mut self, apply_hole_filter: bool) -> (ColorFrame, DepthFramePromise) {
         let mut color_frame = Frame {
             frame: ptr::null_mut(),
         };
-        let mut depth_frame = Frame {
+        let mut depth_frame_promise = DepthFramePromise {
+            queue: ptr::null_mut(),
             frame: ptr::null_mut(),
         };
 
@@ -155,7 +156,7 @@ impl Realsense {
             panic_err(err);
 
             for i in 0..frames_count {
-                let mut frame_ptr = rs2_extract_frame(composite, i, &mut err);
+                let frame_ptr = rs2_extract_frame(composite, i, &mut err);
                 panic_err(err);
 
                 // depth frame
@@ -169,13 +170,12 @@ impl Realsense {
                         rs2_frame_add_ref(frame_ptr, &mut err);
                         panic_err(err);
                         rs2_process_frame(self.hole_filter, frame_ptr, &mut err);
-                        let processed_frame = rs2_wait_for_frame(self.frame_queue, 1000, &mut err);
-                        panic_err(err);
-                        rs2_release_frame(frame_ptr);
-                        frame_ptr = processed_frame;
-                    }
 
-                    depth_frame.frame = frame_ptr;
+                        depth_frame_promise = DepthFramePromise {
+                            queue: self.frame_queue,
+                            frame: frame_ptr,
+                        };
+                    }
                 }
 
                 // color resp. video frame
@@ -192,7 +192,7 @@ impl Realsense {
             rs2_release_frame(composite);
         }
 
-        (ColorFrame(color_frame), DepthFrame(depth_frame))
+        (ColorFrame(color_frame), depth_frame_promise)
     }
 
     pub fn depth_at_pixel(
@@ -372,19 +372,19 @@ impl Deref for DepthFrame {
 impl DepthFrame {
     pub fn to_owned_rgb(&self) -> Vec<u8> {
         let data = self.data_slice();
-        let mut conv_data = vec![0; self.width() as usize *self.height() as usize *3];
+        let mut conv_data = vec![0; self.width() as usize * self.height() as usize * 3];
 
         for x in 0..self.width() as usize {
             for y in 0..self.height() as usize {
                 let s = self.stride() as usize;
-                let depth = (data[x*2+1 + y*s] as u16) << 8 | data[x*2 + y*s] as u16;
+                let depth = (data[x * 2 + 1 + y * s] as u16) << 8 | data[x * 2 + y * s] as u16;
                 //let depth_u8 = (depth as u32 * u8::MAX as u32 / u16::MAX as u32) as u8;
                 let depth_u8 = (depth as u32 * u8::MAX as u32 / 8192) as u8;
- 
+
                 let s = self.width() as usize * 3;
-                conv_data[(x*3+0) + y*s] = depth_u8;
-                conv_data[(x*3+1) + y*s] = depth_u8;
-                conv_data[(x*3+2) + y*s] = depth_u8;
+                conv_data[(x * 3 + 0) + y * s] = depth_u8;
+                conv_data[(x * 3 + 1) + y * s] = depth_u8;
+                conv_data[(x * 3 + 2) + y * s] = depth_u8;
             }
         }
 
@@ -398,9 +398,9 @@ impl DepthFrame {
         for x in 0..self.width() as usize {
             for y in 0..self.height() as usize {
                 let s = self.stride() as usize;
-                let depth = (data[x + y*s] as u16) << 8 | data[(x+1) + y*s] as u16;
+                let depth = (data[x + y * s] as u16) << 8 | data[(x + 1) + y * s] as u16;
                 let depth_u8 = (depth as u32 * u8::MAX as u32 / u16::MAX as u32) as u8;
- 
+
                 conv_data[x + y * self.width() as usize] = depth_u8;
             }
         }
@@ -534,6 +534,35 @@ impl Drop for Frame {
     fn drop(&mut self) {
         unsafe {
             rs2_release_frame(self.frame);
+        }
+    }
+}
+
+pub struct DepthFramePromise {
+    queue: *mut rs2_frame_queue,
+    frame: *mut rs2_frame,
+}
+
+impl DepthFramePromise {
+    pub fn get(self) -> DepthFrame {
+        unsafe {
+            let mut err = ptr::null_mut();
+            let processed_frame = rs2_wait_for_frame(self.queue, 1000, &mut err);
+            panic_err(err);
+
+            DepthFrame(Frame {
+                frame: processed_frame,
+            })
+        }
+    }
+}
+
+impl Drop for DepthFrame {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.frame.is_null() {
+                rs2_release_frame(self.frame);
+            }
         }
     }
 }

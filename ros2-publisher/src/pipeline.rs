@@ -156,6 +156,9 @@ pub fn process_blocking(
         std::thread::sleep(avg_pipeline_execution_duration); // the results are likely ready after we wake up
         future.wait(None).unwrap(); // spin-lock?
 
+        // get actual depth image with holes filled
+        let depth_image = depth_image.get();
+
         // print results
         let (c, area) = tracker::centroid(&download.transfer());
         let area_px = (area * color_image.area() as f32) as u32;

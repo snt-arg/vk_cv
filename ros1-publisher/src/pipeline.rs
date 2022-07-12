@@ -180,6 +180,9 @@ pub fn process_blocking(
             },
         };
 
+        // get actual depth image with holes filled
+        let depth_image = depth_image.get();
+
         // get the depth only if our object is bigger than 225px² (15x15)
         if area_px > config.min_area {
             let pixel_coords = [

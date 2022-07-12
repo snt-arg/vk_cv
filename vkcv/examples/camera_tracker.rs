@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use vkcv::{
     draw::{draw_centroid, OwnedImage},
     endpoints::{image_download::ImageDownload, image_upload::ImageUpload},
@@ -9,7 +11,7 @@ use vkcv::{
         output::Output,
         tracker::{self, Canvas, PoolingStrategy, Tracker},
     },
-    realsense::{ColorFrame, Realsense},
+    realsense::Realsense,
     utils::{self, ImageInfo},
     utils::{cv_pipeline_sequential, cv_pipeline_sequential_debug},
     vk_init,
@@ -18,9 +20,25 @@ use vkcv::{
 use anyhow::Result;
 use vulkano::sync::{self, GpuFuture};
 
-const DBG_PROFILE: bool = true;
+use sysinfo::{Pid, PidExt, ProcessExt, System, SystemExt};
+
+const DBG_PROFILE: bool = false;
 
 fn main() -> Result<()> {
+    // setup sysinfo
+    let mut sys = System::new();
+    sys.refresh_processes();
+
+    let mut last_cpu_refresh = std::time::Instant::now();
+
+    // open histogram file
+    let hist_file =
+        std::fs::File::create(format!("{}/hist.csv", env!("CARGO_MANIFEST_DIR"))).unwrap();
+    let mut hist_buf = std::io::BufWriter::new(hist_file);
+    hist_buf
+        .write_all(&"frame,pipeline_time,cpu\n".as_bytes())
+        .unwrap();
+
     // v3d specs/properties:
     //
     // maxComputeWorkGroupSize: 256
@@ -124,7 +142,7 @@ fn main() -> Result<()> {
 
     loop {
         // grab depth and color image from the realsense
-        let (color_image, depth_image) = camera.fetch_image(true);
+        let (color_image, mut depth_image) = camera.fetch_image(true);
 
         // time
         let pipeline_started = std::time::Instant::now();
@@ -166,7 +184,7 @@ fn main() -> Result<()> {
                 c[0] * color_image.width() as f32,
                 c[1] * color_image.height() as f32,
             ];
-            let depth = camera.depth_at_pixel(&pixel_coords, &color_image, &depth_image);
+            let depth = camera.depth_at_pixel(&pixel_coords, &color_image, &depth_image.get());
 
             // de-project to obtain a 3D point in camera coordinates
             if let Some(depth) = depth {
@@ -211,6 +229,27 @@ fn main() -> Result<()> {
                 &format!("{}-", prefix.as_millis()),
             );
         }
+
+        // print stats
+        let pid = Pid::from_u32(std::process::id());
+        let mut cpu_usage = 0.0;
+        if sys.refresh_process(pid)
+            && std::time::Instant::now() - last_cpu_refresh > std::time::Duration::from_secs(1)
+        {
+            last_cpu_refresh = std::time::Instant::now();
+            let proc = sys.processes().get(&pid).unwrap();
+            cpu_usage = proc.cpu_usage();
+
+            if cpu_usage > 0.0 {
+                println!("cpu usage of this process {:.2}%", cpu_usage);
+            }
+        }
+
+        hist_buf
+            .write_all(
+                &format!("{},{},{}\n", frame, pipeline_dt.as_secs_f32(), cpu_usage).as_bytes(),
+            )
+            .unwrap();
 
         frame += 1;
     }
