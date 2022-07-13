@@ -557,7 +557,7 @@ impl DepthFramePromise {
     }
 }
 
-impl Drop for DepthFrame {
+impl Drop for DepthFramePromise {
     fn drop(&mut self) {
         unsafe {
             if !self.frame.is_null() {
