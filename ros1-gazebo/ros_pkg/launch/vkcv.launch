@@ -1,0 +1,3 @@
+<launch>
+   <node name="vkcv-gazebo" pkg="vkcv-gazebo" type="vkcv-gazebo" args="-t" output="screen"/>
+</launch>

@@ -472,7 +472,7 @@ impl Frame {
     }
 
     pub fn area(&self) -> u32 {
-        self.width() * self.height()
+        self.image_info().area()
     }
 
     pub fn image_info(&self) -> ImageInfo {

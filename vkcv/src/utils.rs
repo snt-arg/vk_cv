@@ -4,7 +4,7 @@ use std::{fs::File, io::BufWriter, path::Path};
 
 use vulkano::command_buffer::PrimaryAutoCommandBuffer;
 use vulkano::device::{Device, Queue};
-use vulkano::format::Format;
+pub use vulkano::format::Format;
 use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
 use vulkano::sync::{self, GpuFuture};
 
@@ -38,6 +38,10 @@ impl ImageInfo {
 
     pub fn stride(&self) -> u32 {
         self.width * self.bytes_per_pixel()
+    }
+
+    pub fn area(&self) -> u32 {
+        self.width * self.height
     }
 }
 
@@ -381,4 +385,25 @@ pub fn basic_label(name: &str, image: &StorageImage) -> String {
         image.dimensions().height(),
         image.format().components().iter().sum::<u8>()
     )
+}
+
+pub fn rgb8_to_rgba8(info: &ImageInfo, data: &[u8]) -> (ImageInfo, Vec<u8>) {
+    assert!(info.format == Format::R8G8B8_UINT);
+
+    let new_info = ImageInfo {
+        width: info.width,
+        height: info.height,
+        format: Format::R8G8B8A8_UINT,
+    };
+
+    // perform conversion
+    let mut out = Vec::with_capacity(data.len());
+    for i in 0..data.len() / 3 {
+        out.push(data[i * 3 + 0]);
+        out.push(data[i * 3 + 1]);
+        out.push(data[i * 3 + 2]);
+        out.push(255);
+    }
+
+    (new_info, out)
 }

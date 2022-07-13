@@ -4,5 +4,6 @@
 members = [
     "vkcv",
     "ros1-publisher",
+    "ros1-gazebo",
     #"ros2-publisher",
 ]
