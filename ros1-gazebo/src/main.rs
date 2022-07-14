@@ -190,25 +190,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let pos = &pose.pose.position;
                         let ori = &pose.pose.orientation;
 
-                        let transl = nalgebra::Vector3::new(pos.x, pos.y, pos.z);
+                        let transl = nalgebra::Vector3::new(pos.x, pos.y, pos.z + 0.35);
                         let quat = nalgebra::Quaternion::new(ori.w, ori.x, ori.y, ori.z);
                         let quat = nalgebra::UnitQuaternion::new_unchecked(quat);
                         let wtb = nalgebra::Isometry3::new(transl, quat.scaled_axis());
 
                         // let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(0.0, 0.5235987756, -1.570796327);
-                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(2.356194490, 0.0, 3.141592654);
+                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(2.094395102, 0.0, 0.0);
                         let transl = nalgebra::Vector3::new(0.0, 0.22, -0.025);
                         let btc = nalgebra::Isometry3::new(transl, quat.scaled_axis());
 
-                        let point_pos = nalgebra::Vector3::new(msg.x, msg.y, msg.z);
-                        let point_in_world = (wtb* btc) * point_pos;
+                        let point_pos = nalgebra::Point3::new(msg.x, msg.y, msg.z);
+                        let point_in_world = (wtb * btc) * point_pos;
                         world_point_pub.send(msg::geometry_msgs::Point {
                             x: point_in_world[0],
                             y: point_in_world[1],
                             z: point_in_world[2]
                         }).expect("Failed to send '~/point'");
-
-                        println!("{}", wtb);
                     };
 
                     point_pub.send(msg).expect("Failed to send '~/local_point'");

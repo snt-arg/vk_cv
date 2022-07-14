@@ -198,7 +198,7 @@ pub fn process_blocking(
                 let x = (pixel_coords[0] - cx) / fx * z;
                 let y = (pixel_coords[1] - cy) / fy * z;
 
-                let point = [x, y, z];
+                let point = [-x, -y, z];
 
                 // ignore this measurement if we hit a hole in the depth image
                 if point[2] > 0.0 && rosrust::is_ok() {
