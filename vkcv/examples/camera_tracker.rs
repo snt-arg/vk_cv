@@ -9,6 +9,7 @@ use vkcv::{
         input::Input,
         morphology::{Morphology, Operation},
         output::Output,
+        pooling::{self, Pooling},
         tracker::{self, Canvas, PoolingStrategy, Tracker},
     },
     realsense::Realsense,
@@ -82,6 +83,7 @@ fn main() -> Result<()> {
     let pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
     let pe_erode = Morphology::new(Operation::Erode);
     let pe_dilate = Morphology::new(Operation::Dilate);
+    let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
     let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
     let pe_out = Output::new();
 
@@ -89,7 +91,14 @@ fn main() -> Result<()> {
         device.clone(),
         queue.clone(),
         &pe_input,
-        &[&pe_hsv, &pe_hsv_filter, &pe_erode, &pe_dilate, &pe_tracker],
+        &[
+            &pe_hsv,
+            &pe_hsv_filter,
+            &pe_erode,
+            &pe_dilate,
+            &pe_pooling,
+            &pe_tracker,
+        ],
         &pe_out,
     );
 
@@ -97,7 +106,14 @@ fn main() -> Result<()> {
         device.clone(),
         queue.clone(),
         &pe_input,
-        &[&pe_hsv, &pe_hsv_filter, &pe_erode, &pe_dilate, &pe_tracker],
+        &[
+            &pe_hsv,
+            &pe_hsv_filter,
+            &pe_erode,
+            &pe_dilate,
+            &pe_pooling,
+            &pe_tracker,
+        ],
         &pe_out,
     );
 
@@ -142,7 +158,7 @@ fn main() -> Result<()> {
 
     loop {
         // grab depth and color image from the realsense
-        let (color_image, mut depth_image) = camera.fetch_image(true);
+        let (color_image, depth_image) = camera.fetch_image(true);
 
         // time
         let pipeline_started = std::time::Instant::now();
