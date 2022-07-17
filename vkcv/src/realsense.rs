@@ -143,7 +143,7 @@ impl Realsense {
             frame: ptr::null_mut(),
         };
         let mut depth_frame_promise = DepthFramePromise {
-            queue: ptr::null_mut(),
+            realsense: self,
             frame: ptr::null_mut(),
         };
 
@@ -171,10 +171,7 @@ impl Realsense {
                         panic_err(err);
                         rs2_process_frame(self.hole_filter, frame_ptr, &mut err);
 
-                        depth_frame_promise = DepthFramePromise {
-                            queue: self.frame_queue,
-                            frame: frame_ptr,
-                        };
+                        depth_frame_promise.frame = frame_ptr;
                     }
                 }
 
@@ -538,16 +535,16 @@ impl Drop for Frame {
     }
 }
 
-pub struct DepthFramePromise {
-    queue: *mut rs2_frame_queue,
+pub struct DepthFramePromise<'a> {
+    realsense: &'a Realsense,
     frame: *mut rs2_frame,
 }
 
-impl DepthFramePromise {
+impl<'a> DepthFramePromise<'a> {
     pub fn get(self) -> DepthFrame {
         unsafe {
             let mut err = ptr::null_mut();
-            let processed_frame = rs2_wait_for_frame(self.queue, 1000, &mut err);
+            let processed_frame = rs2_wait_for_frame(self.realsense.frame_queue, 1000, &mut err);
             panic_err(err);
 
             DepthFrame(Frame {
@@ -557,7 +554,7 @@ impl DepthFramePromise {
     }
 }
 
-impl Drop for DepthFramePromise {
+impl<'a> Drop for DepthFramePromise<'a> {
     fn drop(&mut self) {
         unsafe {
             if !self.frame.is_null() {
