@@ -603,6 +603,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
 
 [[package]]
+name = "half"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c207b0ee023c7fce79daf01828163aaf53a1ddd0be8b1ef9541da7d41f6fa63a"
+
+[[package]]
 name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1990,7 +1996,7 @@ name = "vkcv"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "half",
+ "half 2.0.0",
  "png",
  "realsense-sys",
  "sysinfo",
@@ -2007,7 +2013,7 @@ dependencies = [
  "ash",
  "bytemuck",
  "crossbeam-queue",
- "half",
+ "half 1.8.2",
  "heck 0.4.0",
  "indexmap",
  "lazy_static",
