@@ -37,7 +37,7 @@ fn main() -> Result<()> {
         std::fs::File::create(format!("{}/hist.csv", env!("CARGO_MANIFEST_DIR"))).unwrap();
     let mut hist_buf = std::io::BufWriter::new(hist_file);
     hist_buf
-        .write_all(&"frame,pipeline_time,cpu\n".as_bytes())
+        .write_all(&"frame,pipeline_time,fps,cpu\n".as_bytes())
         .unwrap();
 
     // v3d specs/properties:
@@ -255,7 +255,8 @@ fn main() -> Result<()> {
 
         // print stats
         let pid = Pid::from_u32(std::process::id());
-        let mut cpu_usage = 0.0;
+        let mut cpu_usage = f32::NAN;
+        let mut fps = f32::NAN;
         if std::time::Instant::now() - last_stats > std::time::Duration::from_millis(500) {
             last_stats = std::time::Instant::now();
 
@@ -264,8 +265,7 @@ fn main() -> Result<()> {
                 cpu_usage = proc.cpu_usage();
             }
 
-            let fps =
-                (frame - last_frame) as f32 / std::time::Duration::from_millis(500).as_secs_f32();
+            fps = (frame - last_frame) as f32 / std::time::Duration::from_millis(500).as_secs_f32();
             last_frame = frame;
 
             println!("fps: {:.0}, cpu: {:.0}%", fps, cpu_usage);
@@ -273,7 +273,14 @@ fn main() -> Result<()> {
 
         hist_buf
             .write_all(
-                &format!("{},{},{}\n", frame, pipeline_dt.as_secs_f32(), cpu_usage).as_bytes(),
+                &format!(
+                    "{},{},{},{}\n",
+                    frame,
+                    pipeline_dt.as_secs_f32(),
+                    fps,
+                    cpu_usage
+                )
+                .as_bytes(),
             )
             .unwrap();
 
