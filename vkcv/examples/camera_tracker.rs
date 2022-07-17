@@ -30,7 +30,7 @@ fn main() -> Result<()> {
     let mut sys = System::new();
     sys.refresh_processes();
 
-    let mut last_cpu_refresh = std::time::Instant::now();
+    let mut last_stats = std::time::Instant::now();
 
     // open histogram file
     let hist_file =
@@ -155,6 +155,7 @@ fn main() -> Result<()> {
 
     let start_of_program = std::time::Instant::now();
     let mut frame = 0u32;
+    let mut last_frame = 0;
 
     loop {
         // grab depth and color image from the realsense
@@ -176,6 +177,9 @@ fn main() -> Result<()> {
         // wait till finished
         std::thread::sleep(avg_pipeline_execution_duration); // the results are likely ready after we wake up
         future.wait(None).unwrap(); // spin-lock?
+
+        // get processed depth image
+        let depth_image = depth_image.get();
 
         // print results
         let pipeline_dt = std::time::Instant::now() - pipeline_started;
@@ -200,7 +204,7 @@ fn main() -> Result<()> {
                 c[0] * color_image.width() as f32,
                 c[1] * color_image.height() as f32,
             ];
-            let depth = camera.depth_at_pixel(&pixel_coords, &color_image, &depth_image.get());
+            let depth = camera.depth_at_pixel(&pixel_coords, &color_image, &depth_image);
 
             // de-project to obtain a 3D point in camera coordinates
             if let Some(depth) = depth {
@@ -252,16 +256,19 @@ fn main() -> Result<()> {
         // print stats
         let pid = Pid::from_u32(std::process::id());
         let mut cpu_usage = 0.0;
-        if sys.refresh_process(pid)
-            && std::time::Instant::now() - last_cpu_refresh > std::time::Duration::from_secs(1)
-        {
-            last_cpu_refresh = std::time::Instant::now();
-            let proc = sys.processes().get(&pid).unwrap();
-            cpu_usage = proc.cpu_usage();
+        if std::time::Instant::now() - last_stats > std::time::Duration::from_millis(500) {
+            last_stats = std::time::Instant::now();
 
-            if cpu_usage > 0.0 {
-                println!("cpu usage of this process {:.2}%", cpu_usage);
+            if sys.refresh_process(pid) {
+                let proc = sys.processes().get(&pid).unwrap();
+                cpu_usage = proc.cpu_usage();
             }
+
+            let fps =
+                (frame - last_frame) as f32 / std::time::Duration::from_millis(500).as_secs_f32();
+            last_frame = frame;
+
+            println!("fps: {:.0}, cpu: {:.0}%", fps, cpu_usage);
         }
 
         hist_buf
