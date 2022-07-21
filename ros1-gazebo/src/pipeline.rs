@@ -132,7 +132,7 @@ pub fn process_blocking(
             .unwrap();
 
         // wait till finished
-        future.wait(None).unwrap(); // spin-lock?
+        future.wait(None).unwrap(); // spin-lock
 
         // print results
         let (c, area) = tracker::centroid(&download.transfer());
