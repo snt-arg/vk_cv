@@ -1,4 +1,3 @@
-use rosrust::Duration;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::msg;
@@ -14,7 +13,6 @@ use vkcv::{
         pooling::{self, Pooling},
         tracker::{self, Canvas, PoolingStrategy, Tracker},
     },
-    realsense::{ColorFrame, Realsense},
     utils::{cv_pipeline_sequential, ImageInfo},
     vk_init,
     vulkano::{
@@ -27,8 +25,6 @@ pub type Point3 = msg::geometry_msgs::Point;
 pub type Bool = msg::std_msgs::Bool;
 pub type Image = OwnedImage;
 pub type RosImageCompressed = msg::sensor_msgs::CompressedImage;
-
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
