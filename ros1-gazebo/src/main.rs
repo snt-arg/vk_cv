@@ -53,8 +53,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (cv_image_tx, mut cv_image_rx) = mpsc::channel::<pipeline::Image>(1);
     let (cv_depth_image_tx, mut cv_depth_image_rx) = mpsc::channel::<pipeline::Image>(1);
 
-    let (ros_color_image_tx, mut ros_color_image_rx) = mpsc::channel::<msg::sensor_msgs::Image>(1);
-    let (ros_depth_image_tx, mut ros_depth_image_rx) = mpsc::channel::<msg::sensor_msgs::Image>(1);
+    let (ros_color_image_tx, ros_color_image_rx) = mpsc::channel::<msg::sensor_msgs::Image>(1);
+    let (ros_depth_image_tx, ros_depth_image_rx) = mpsc::channel::<msg::sensor_msgs::Image>(1);
     let (ros_camera_info_tx, mut ros_camera_info_rx) =
         mpsc::channel::<msg::sensor_msgs::CameraInfo>(1);
     let (mavros_pose_tx, mut mavros_pose_rx) = mpsc::channel::<msg::geometry_msgs::PoseStamped>(1);
@@ -63,41 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     rosrust::init("vkcv");
 
     // pose
-    let mut uav_pose = std::sync::Mutex::new(msg::geometry_msgs::PoseStamped::default());
-
-    // subscribers
-    let _color_img_sub = rosrust::subscribe(
-        "/camera/color/image_raw",
-        1,
-        move |msg: msg::sensor_msgs::Image| {
-            ros_color_image_tx.try_send(msg).ok();
-        },
-    )
-    .unwrap();
-    let _depth_img_sub = rosrust::subscribe(
-        "/camera/depth/image_raw",
-        1,
-        move |msg: msg::sensor_msgs::Image| {
-            ros_depth_image_tx.try_send(msg).ok();
-        },
-    )
-    .unwrap();
-    let _cam_info_sub = rosrust::subscribe(
-        "/camera/color/camera_info",
-        1,
-        move |msg: msg::sensor_msgs::CameraInfo| {
-            ros_camera_info_tx.try_send(msg).ok();
-        },
-    )
-    .unwrap();
-    let _uav_pose_sub = rosrust::subscribe(
-        "/mavros/local_position/pose",
-        1,
-        move |msg: msg::geometry_msgs::PoseStamped| {
-            mavros_pose_tx.try_send(msg).ok();
-        },
-    )
-    .unwrap();
+    let uav_pose = std::sync::Mutex::new(msg::geometry_msgs::PoseStamped::default());
 
     // publishers
     let point_pub = rosrust::publish::<pipeline::Point3>("/vkcv/local_point", 1)?;
@@ -110,8 +76,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rosrust::publish::<pipeline::RosImageCompressed>("/vkcv/camera_depth_image/compressed", 1)?;
 
     let lock_pub = rosrust::publish::<pipeline::Bool>("/vkcv/lock", 1)?;
-
-    let (exit_tx, exit_rx) = std::sync::mpsc::channel();
 
     // setup vkcv
     let cv_config = pipeline::Config {
@@ -127,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let vkcv_handle = tokio::task::spawn_blocking(move || {
         let ros_camera_info = ros_camera_info_rx.blocking_recv().unwrap();
 
-        match pipeline::process_blocking(
+        pipeline::process_blocking(
             cv_config,
             cv_point3_tx,
             cv_image_tx,
@@ -135,11 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ros_color_image_rx,
             ros_depth_image_rx,
             ros_camera_info,
-            exit_rx,
-        ) {
-            Err(_) => println!("Cannot open camera"),
-            _ => (),
-        }
+        )
     });
 
     // setup jpeg compressor
@@ -150,11 +110,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lock_ticker = tokio::time::interval(std::time::Duration::from_millis(250));
 
     // publishing thread
-    let exit_tx_main = exit_tx.clone();
     let main_handle = tokio::task::spawn(async move {
         let mut last_seen = None;
 
-        //let iso = nalgebra::Isometry3::new(transl, quat.scaled_axis());
+        // subscribers
+        // declare them here such that they go out of scope when exiting this task
+        // (the channels are subsequently closed)
+        let _color_img_sub = rosrust::subscribe(
+            "/camera/color/image_raw",
+            1,
+            move |msg: msg::sensor_msgs::Image| {
+                ros_color_image_tx.try_send(msg).ok();
+            },
+        )
+        .unwrap();
+        let _depth_img_sub = rosrust::subscribe(
+            "/camera/depth/image_raw",
+            1,
+            move |msg: msg::sensor_msgs::Image| {
+                ros_depth_image_tx.try_send(msg).ok();
+            },
+        )
+        .unwrap();
+        let _cam_info_sub = rosrust::subscribe(
+            "/camera/color/camera_info",
+            1,
+            move |msg: msg::sensor_msgs::CameraInfo| {
+                ros_camera_info_tx.try_send(msg).ok();
+            },
+        )
+        .unwrap();
+        let _uav_pose_sub = rosrust::subscribe(
+            "/mavros/local_position/pose",
+            1,
+            move |msg: msg::geometry_msgs::PoseStamped| {
+                mavros_pose_tx.try_send(msg).ok();
+            },
+        )
+        .unwrap();
 
         loop {
             tokio::select! {
@@ -248,19 +241,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Ok(_) = signal::ctrl_c() => {
-                    exit_tx_main.send(true).unwrap();
-                    return; // exit thread
+                    println!("interrupt");
+                    rosrust::shutdown();
+                    break; // exit thread
                 }
             }
         }
+        println!("exit main loop");
     });
 
-    // keep running (blocking)
-    rosrust::spin();
-    println!("exit ros node, wait for threads to finish...");
-    exit_tx.send(true).unwrap();
     tokio::join!(main_handle, vkcv_handle);
-    println!("exit threads");
+    println!("shutdown");
 
     Ok(())
 }

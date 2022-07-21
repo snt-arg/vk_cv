@@ -1,3 +1,4 @@
+use rosrust::Duration;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::msg;
@@ -62,7 +63,6 @@ pub fn process_blocking(
     mut ros_color_image: Receiver<msg::sensor_msgs::Image>,
     mut ros_depth_image: Receiver<msg::sensor_msgs::Image>,
     camera_info: msg::sensor_msgs::CameraInfo,
-    exit_signal: std::sync::mpsc::Receiver<bool>,
 ) -> anyhow::Result<()> {
     println!("CV: Realsense camera tracker");
 
@@ -115,7 +115,7 @@ pub fn process_blocking(
     let mut download = ImageDownload::from_io(output_io).unwrap();
 
     println!("CV: Entering main loop");
-    loop {
+    while rosrust::is_ok() {
         // grab depth and color image from the gazebo realsense
         let color_frame =
             vkcv::utils::rgb8_to_rgba8(&img_info, &ros_color_image.blocking_recv().unwrap().data);
@@ -202,24 +202,18 @@ pub fn process_blocking(
 
                 // ignore this measurement if we hit a hole in the depth image
                 if point[2] > 0.0 && rosrust::is_ok() {
-                    sender_point3
-                        .blocking_send(Point3 {
-                            x: point[0] as f64,
-                            y: point[1] as f64,
-                            z: point[2] as f64,
-                        })
-                        .unwrap();
+                    sender_point3.blocking_send(Point3 {
+                        x: point[0] as f64,
+                        y: point[1] as f64,
+                        z: point[2] as f64,
+                    })?;
                 }
             }
         }
 
         // send image
         if config.transmit_image {
-            if rosrust::is_ok() {
-                sender_image
-                    .blocking_send(owned_image)
-                    .expect("Failed to transmit image");
-            }
+            sender_image.blocking_send(owned_image)?;
         }
 
         // send depth image
@@ -234,16 +228,9 @@ pub fn process_blocking(
                 },
             };
 
-            if rosrust::is_ok() {
-                sender_depth_image
-                    .blocking_send(owned_image)
-                    .expect("Failed to transmit image");
-            }
-        }
-
-        if let Ok(_) = exit_signal.try_recv() {
-            println!("exit camera thread");
-            return Ok(());
+            sender_depth_image.blocking_send(owned_image)?;
         }
     }
+
+    Ok(())
 }
