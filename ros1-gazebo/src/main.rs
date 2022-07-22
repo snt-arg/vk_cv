@@ -38,7 +38,7 @@ struct Opt {
     #[structopt(short, long, default_value = "16")]
     min_area: u32,
 
-    /// Roslaunch adds some special args
+    /// roslaunch adds some special args
     /// e.g. __name:=... __log:=...
     #[structopt(name = "__ros_args", default_value = "")]
     _rargs: Vec<String>,
@@ -190,7 +190,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let wtb = nalgebra::Isometry3::new(transl, quat.scaled_axis());
 
                         // transform: camera to body
-                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(0.0, 30.0.deg(), -90.0.deg()) ;
+                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(0.0, 40.0.deg(), -90.0.deg()) ;
                         let transl = nalgebra::Vector3::new(0.0, 0.22, -0.025);
                         let btc = nalgebra::Isometry3::new(transl, quat.scaled_axis());
 
@@ -256,7 +256,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("exit main loop");
     });
 
-    tokio::join!(main_handle, vkcv_handle);
+    let _ = tokio::join!(main_handle, vkcv_handle);
     println!("shutdown");
 
     Ok(())
@@ -270,8 +270,4 @@ impl Deg for f64 {
     fn deg(self) -> f64 {
         self / 180.0 * std::f64::consts::PI
     }
-}
-
-pub fn deg(deg: f64) -> f64 {
-    deg / 180.0 * std::f64::consts::PI
 }
