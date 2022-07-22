@@ -183,18 +183,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let pos = &pose.pose.position;
                         let ori = &pose.pose.orientation;
 
+                        // transform: body to world
                         let transl = nalgebra::Vector3::new(pos.x, pos.y, pos.z + 0.35);
                         let quat = nalgebra::Quaternion::new(ori.w, ori.x, ori.y, ori.z);
                         let quat = nalgebra::UnitQuaternion::new_unchecked(quat);
                         let wtb = nalgebra::Isometry3::new(transl, quat.scaled_axis());
 
-                        // let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(0.0, 0.5235987756, -1.570796327);
-                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(2.094395102, 0.0, 0.0);
+                        // transform: camera to body
+                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(0.0, 30.0.deg(), -90.0.deg()) ;
                         let transl = nalgebra::Vector3::new(0.0, 0.22, -0.025);
                         let btc = nalgebra::Isometry3::new(transl, quat.scaled_axis());
 
+                        // transform: sensor to camera
+                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0) ;
+                        let transl = nalgebra::Vector3::new(0.0, 0.0175, 0.0125);
+                        let cts = nalgebra::Isometry3::new(transl, quat.scaled_axis());
+
                         let point_pos = nalgebra::Point3::new(msg.x, msg.y, msg.z);
-                        let point_in_world = (wtb * btc) * point_pos;
+                        let point_in_world = (wtb * btc * cts) * point_pos;
                         world_point_pub.send(msg::geometry_msgs::Point {
                             x: point_in_world[0],
                             y: point_in_world[1],
@@ -254,4 +260,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("shutdown");
 
     Ok(())
+}
+
+trait Deg {
+    fn deg(self) -> f64;
+}
+
+impl Deg for f64 {
+    fn deg(self) -> f64 {
+        self / 180.0 * std::f64::consts::PI
+    }
+}
+
+pub fn deg(deg: f64) -> f64 {
+    deg / 180.0 * std::f64::consts::PI
 }

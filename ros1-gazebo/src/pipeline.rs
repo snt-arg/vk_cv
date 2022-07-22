@@ -197,11 +197,13 @@ pub fn process_blocking(
                 let point = [-x, -y, z];
 
                 // ignore this measurement if we hit a hole in the depth image
+                // x axis is pointing forwards
+                // as opposed to the z axis on the actual realsense
                 if point[2] > 0.0 && rosrust::is_ok() {
                     sender_point3.blocking_send(Point3 {
-                        x: point[0] as f64,
-                        y: point[1] as f64,
-                        z: point[2] as f64,
+                        x: point[2] as f64 - 0.1,
+                        y: point[0] as f64,
+                        z: point[1] as f64,
                     })?;
                 }
             }
