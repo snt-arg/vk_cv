@@ -54,9 +54,7 @@ pub fn init() -> (Arc<Device>, Arc<Queue>) {
     let (device, mut queues) = Device::new(
         physical_device,
         DeviceCreateInfo {
-            enabled_extensions: physical_device
-                .required_extensions()
-                .union(&device_extensions),
+            enabled_extensions: device_extensions,
             queue_create_infos: vec![QueueCreateInfo {
                 queues: vec![0.5],
                 ..QueueCreateInfo::family(queue_family_graphics)

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
-    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
+    command_buffer::{AutoCommandBufferBuilder, CopyBufferToImageInfo, PrimaryAutoCommandBuffer},
     device::{Device, Queue},
 };
 
@@ -40,8 +40,12 @@ impl ProcessingElement for Input {
         .unwrap();
 
         // build command buffer
+
         builder
-            .copy_buffer_to_image(input_buffer.clone(), output_img.clone())
+            .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(
+                input_buffer.clone(),
+                output_img.clone(),
+            ))
             .unwrap();
 
         IoFragment {

@@ -166,10 +166,10 @@ pub fn create_storage_image(
     img_info: &ImageInfo,
 ) -> Arc<StorageImage> {
     let usage = ImageUsage {
-        transfer_source: true,
-        transfer_destination: true,
         storage: true,
         sampled: true,
+        transfer_src: true,
+        transfer_dst: true,
         ..ImageUsage::none()
     };
     let flags = ImageCreateFlags::none();
