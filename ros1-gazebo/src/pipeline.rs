@@ -40,8 +40,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            hsv_min: [0.138, 0.6, 0.239],
-            hsv_max: [0.198, 1.0, 1.0],
+            hsv_min: [0.2, 0.6, 0.239],
+            hsv_max: [0.4, 1.0, 1.0],
             min_area: 4 * 4,
             transmit_image: false,
             transmit_depth_image: false,

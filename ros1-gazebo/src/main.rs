@@ -143,7 +143,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _uav_pose_sub = rosrust::subscribe(
             "/mavros/local_position/pose",
             1,
-            move |msg: msg::geometry_msgs::PoseStamped| {
+            move |mut msg: msg::geometry_msgs::PoseStamped| {
+                msg.pose.position.z = msg.pose.position.z + 0.4; // z offset during spawn
                 mavros_pose_tx.try_send(msg).ok();
             },
         )
@@ -184,13 +185,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let ori = &pose.pose.orientation;
 
                         // transform: body to world
-                        let transl = nalgebra::Vector3::new(pos.x, pos.y, pos.z + 0.35);
+                        let transl = nalgebra::Vector3::new(pos.x, pos.y, pos.z );
                         let quat = nalgebra::Quaternion::new(ori.w, ori.x, ori.y, ori.z);
                         let quat = nalgebra::UnitQuaternion::new_unchecked(quat);
                         let wtb = nalgebra::Isometry3::new(transl, quat.scaled_axis());
 
                         // transform: camera to body
-                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(0.0, 40.0.deg(), -90.0.deg()) ;
+                        let quat: nalgebra::UnitQuaternion<f64> = nalgebra::UnitQuaternion::from_euler_angles(0.0, 55.0.deg(), -90.0.deg()) ;
                         let transl = nalgebra::Vector3::new(0.0, 0.22, -0.025);
                         let btc = nalgebra::Isometry3::new(transl, quat.scaled_axis());
 

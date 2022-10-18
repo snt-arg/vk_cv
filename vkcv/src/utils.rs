@@ -170,9 +170,9 @@ pub fn create_storage_image(
         sampled: true,
         transfer_src: true,
         transfer_dst: true,
-        ..ImageUsage::none()
+        ..ImageUsage::empty()
     };
-    let flags = ImageCreateFlags::none();
+    let flags = ImageCreateFlags::empty();
 
     StorageImage::with_usage(
         device.clone(),
@@ -184,7 +184,7 @@ pub fn create_storage_image(
         img_info.format,
         usage,
         flags,
-        Some(queue.family()),
+        Some(queue.queue_family_index()),
     )
     .unwrap()
 }
@@ -210,7 +210,7 @@ where
 {
     let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
         device.clone(),
-        queue.family(),
+        queue.queue_family_index(),
         vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
     )
     .unwrap();
@@ -253,7 +253,7 @@ where
 {
     let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
         device.clone(),
-        queue.family(),
+        queue.queue_family_index(),
         vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
     )
     .unwrap();
@@ -296,7 +296,7 @@ where
     for pe in elements {
         let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
             device.clone(),
-            queue.family(),
+            queue.queue_family_index(),
             vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
         )
         .unwrap();

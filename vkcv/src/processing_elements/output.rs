@@ -34,7 +34,13 @@ impl ProcessingElement for Output {
                 * depth;
             let output_buffer = CpuAccessibleBuffer::from_iter(
                 device.clone(),
-                BufferUsage::all(),
+                BufferUsage {
+                    transfer_src: true,
+                    transfer_dst: true,
+                    uniform_buffer: true,
+                    storage_buffer: true,
+                    ..Default::default()
+                },
                 false,
                 (0..count).map(|_| 0u8),
             )

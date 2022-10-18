@@ -16,6 +16,11 @@ mod cs {
     vulkano_shaders::shader! {
         ty: "compute",
         path: "src/shaders/color_filter.comp.glsl",
+        types_meta: {
+            use bytemuck::{Pod, Zeroable};
+
+            #[derive(Clone, Copy, Zeroable, Pod)]
+        },
     }
 }
 
