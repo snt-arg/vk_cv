@@ -51,6 +51,13 @@ impl ImageDownload {
             info: &self.info,
         }
     }
+
+    pub fn transferred_image<'a>(&'a self) -> TransferredImage<'a> {
+        TransferredImage {
+            buffer: &self.buffer,
+            info: &self.info,
+        }
+    }
 }
 
 pub struct TransferredImage<'a> {

@@ -10,6 +10,12 @@ use super::{AutoCommandBufferBuilder, Io, IoFragment, PipeOutput, ProcessingElem
 
 pub struct Output {}
 
+impl Default for Output {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Output {
     pub fn new() -> Self {
         Self {}

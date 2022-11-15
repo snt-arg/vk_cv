@@ -1,6 +1,7 @@
 use eframe::egui;
 use egui::{Color32, ColorImage};
 use egui_extras::RetainedImage;
+use vkcv::utils::image_to_rgba8;
 
 mod pipeline;
 
@@ -41,6 +42,7 @@ impl eframe::App for MyApp {
             self.image.show(ui);
 
             let res = pipeline::fetch_and_process(&mut self.pipeline);
+
             self.image = RetainedImage::from_color_image(
                 "",
                 ColorImage::from_rgba_unmultiplied(
@@ -63,6 +65,22 @@ impl eframe::App for MyApp {
                 )),
                 None => ui.heading("Nothing detected"),
             };
+
+            egui::ScrollArea::new([false, true]).show(ui, |ui| {
+                for dl in &self.pipeline.download {
+                    let input_image = dl.transferred_image();
+                    let (info, rgba) =
+                        image_to_rgba8(input_image.info(), input_image.buffer_content());
+                    let input_image = RetainedImage::from_color_image(
+                        "",
+                        ColorImage::from_rgba_unmultiplied(
+                            [info.width as usize, info.height as usize],
+                            &rgba,
+                        ),
+                    );
+                    input_image.show(ui);
+                }
+            });
 
             ctx.request_repaint();
         });

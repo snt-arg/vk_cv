@@ -14,7 +14,7 @@ use vkcv::{
     },
     realsense::Realsense,
     utils::cv_pipeline_sequential,
-    utils::ImageInfo,
+    utils::{cv_pipeline_sequential_with_taps, ImageInfo},
     vk_init::{self, VkContext},
     vulkano::command_buffer::PrimaryAutoCommandBuffer,
 };
@@ -23,7 +23,7 @@ use vkcv::vulkano::sync::{self, GpuFuture};
 
 pub struct Pipeline {
     upload: ImageUpload,
-    download: ImageDownload,
+    pub download: Vec<ImageDownload>,
     ctx: VkContext,
     cam: Realsense,
     cb: Arc<PrimaryAutoCommandBuffer>,
@@ -54,7 +54,7 @@ pub fn init() -> Pipeline {
     let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
     let pe_out = Output::new();
 
-    let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(
+    let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential_with_taps::<_, Output>(
         &ctx,
         &pe_input,
         &[
@@ -65,11 +65,13 @@ pub fn init() -> Pipeline {
             &pe_pooling,
             &pe_tracker,
         ],
-        &pe_out,
     );
 
     let upload = ImageUpload::from_io(input_io).unwrap();
-    let download = ImageDownload::from_io(output_io).unwrap();
+    let download = output_io
+        .iter()
+        .map(|io| ImageDownload::from_io(io.clone()).unwrap())
+        .collect();
 
     Pipeline {
         upload,
@@ -109,8 +111,13 @@ pub fn fetch_and_process(p: &mut Pipeline) -> PipelineResult {
     // get processed depth image
     let depth_image = depth_image.get();
 
+    // transfer all images to host
+    for dl in &mut p.download {
+        dl.transfer();
+    }
+
     // print results
-    let tf_image = p.download.transfer();
+    let tf_image = p.download.last_mut().unwrap().transferred_image();
     let (c, area) = tracker::centroid(&tf_image);
     let area_px = (area * color_image.area() as f32) as u32;
 

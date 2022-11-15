@@ -225,6 +225,39 @@ where
     (command_buffer, input_io, output_io)
 }
 
+pub fn cv_pipeline_sequential_with_taps<I, O>(
+    ctx: &VkContext,
+    input: &I,
+    elements: &[&dyn ProcessingElement],
+) -> (Arc<PrimaryAutoCommandBuffer>, IoFragment, Vec<IoFragment>)
+where
+    I: PipeInput + ProcessingElement,
+    O: PipeOutput + ProcessingElement + Default,
+{
+    let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
+        &ctx.memory.command_buffer_allocator,
+        ctx.queue.queue_family_index(),
+        vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
+    )
+    .unwrap();
+
+    let dummy = IoFragment::none();
+    let input_io = input.build(ctx, &mut builder, &dummy);
+
+    let mut io_fragments = vec![input_io.clone()];
+    let mut outputs = vec![];
+
+    for pe in elements {
+        io_fragments.push(pe.build(ctx, &mut builder, io_fragments.last().as_ref().unwrap()));
+        let output = O::default();
+        let io_out = output.build(ctx, &mut builder, io_fragments.last().as_ref().unwrap());
+        outputs.push(io_out);
+    }
+
+    let command_buffer = Arc::new(builder.build().unwrap());
+    (command_buffer, input_io, outputs)
+}
+
 pub fn cv_pipeline_sequential_debug<I, O>(
     ctx: &VkContext,
     input: &I,
@@ -379,4 +412,41 @@ pub fn rgb8_to_rgba8(info: &ImageInfo, data: &[u8]) -> (ImageInfo, Vec<u8>) {
     }
 
     (new_info, out)
+}
+
+pub fn image_to_rgba8(info: &ImageInfo, data: &[u8]) -> (ImageInfo, Vec<u8>) {
+    let new_info = ImageInfo {
+        width: info.width,
+        height: info.height,
+        format: Format::R8G8B8A8_UINT,
+    };
+    let count = (info.width * info.height * 4) as usize;
+    let mut out = Vec::with_capacity(count);
+
+    match info.format {
+        Format::R8G8B8_UINT => {
+            for cnk in data.chunks(3) {
+                out.push(cnk[0]);
+                out.push(cnk[1]);
+                out.push(cnk[2]);
+                out.push(255);
+            }
+
+            (new_info, out)
+        }
+        Format::R8G8B8A8_UINT => (new_info, data.to_owned()),
+        Format::R8G8B8A8_UNORM => (new_info, data.to_owned()),
+        Format::R8_UINT | Format::R8_UNORM => {
+            for i in 0..data.len() {
+                out.push(data[i]);
+                out.push(data[i]);
+                out.push(data[i]);
+                out.push(255);
+            }
+
+            (new_info, out)
+        }
+        Format::R16G16B16A16_SFLOAT => (new_info, vec![0; count]), // TODO
+        _ => panic!("unsuppored format {:?}", info.format),
+    }
 }
