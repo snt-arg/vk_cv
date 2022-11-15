@@ -12,17 +12,22 @@ pub mod tracker;
 use std::sync::Arc;
 use vulkano::{
     buffer::CpuAccessibleBuffer,
-    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    device::{Device, Queue},
+    command_buffer::{allocator::StandardCommandBufferAllocator, PrimaryAutoCommandBuffer},
     image::StorageImage,
 };
+
+use crate::vk_init::VkContext;
+
+pub type AutoCommandBufferBuilder = vulkano::command_buffer::AutoCommandBufferBuilder<
+    PrimaryAutoCommandBuffer,
+    Arc<StandardCommandBufferAllocator>,
+>;
 
 pub trait ProcessingElement {
     fn build(
         &self,
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         input: &IoFragment,
     ) -> IoFragment;
 }

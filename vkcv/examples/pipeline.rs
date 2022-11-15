@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     let (img_info, img_data) = load_image("lab_image_2_rgba.png");
 
     // init device
-    let (device, queue) = vk_init::init();
+    let ctx = vk_init::init().unwrap();
 
     // create a convolution pipeline
     let pe_input = Input::new(img_info);
@@ -52,8 +52,7 @@ fn main() -> Result<()> {
     let pe_out = Output::new();
 
     let dp = cv_pipeline_sequential_debug(
-        device.clone(),
-        queue.clone(),
+        &ctx,
         &pe_input,
         &[
             &pe_hsv,
@@ -77,10 +76,10 @@ fn main() -> Result<()> {
     upload.copy_input_data(&img_data);
 
     // process on GPU & wait till finished
-    dp.time(device.clone(), queue.clone());
+    dp.time(&ctx);
 
     // save images
-    dp.save_all(device.clone(), queue.clone(), "out", "pipeline-");
+    dp.save_all(&ctx, "out", "pipeline-");
 
     let pipeline_dt = std::time::Instant::now() - pipeline_started;
     println!("Pipeline took {} us", pipeline_dt.as_micros());

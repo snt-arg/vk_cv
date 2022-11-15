@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
-    command_buffer::{AutoCommandBufferBuilder, CopyImageToBufferInfo, PrimaryAutoCommandBuffer},
-    device::{Device, Queue},
+    command_buffer::CopyImageToBufferInfo,
     image::ImageAccess,
 };
 
-use super::{Io, IoFragment, PipeOutput, ProcessingElement};
+use crate::vk_init::VkContext;
+
+use super::{AutoCommandBufferBuilder, Io, IoFragment, PipeOutput, ProcessingElement};
 
 pub struct Output {}
 
@@ -19,9 +19,8 @@ impl Output {
 impl ProcessingElement for Output {
     fn build(
         &self,
-        device: Arc<Device>,
-        _queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         input: &IoFragment,
     ) -> IoFragment {
         // input image
@@ -33,7 +32,7 @@ impl ProcessingElement for Output {
                 * input_img.dimensions().depth()
                 * depth;
             let output_buffer = CpuAccessibleBuffer::from_iter(
-                device.clone(),
+                &ctx.memory.allocator,
                 BufferUsage {
                     transfer_src: true,
                     transfer_dst: true,

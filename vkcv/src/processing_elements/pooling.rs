@@ -1,15 +1,12 @@
-use std::sync::Arc;
 use vulkano::{
-    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
-    device::{Device, Queue},
     image::{view::ImageView, ImageAccess},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
 };
 
-use crate::utils;
+use crate::{utils, vk_init::VkContext};
 
-use super::{Io, IoFragment, ProcessingElement};
+use super::{AutoCommandBufferBuilder, Io, IoFragment, ProcessingElement};
 
 mod cs {
     vulkano_shaders::shader! {
@@ -36,17 +33,16 @@ impl Pooling {
 impl ProcessingElement for Pooling {
     fn build(
         &self,
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         input: &IoFragment,
     ) -> IoFragment {
         let local_size = 16;
 
         let pipeline = {
-            let shader = cs::load(device.clone()).unwrap();
+            let shader = cs::load(ctx.device.clone()).unwrap();
             ComputePipeline::new(
-                device.clone(),
+                ctx.device.clone(),
                 shader.entry_point("main").unwrap(),
                 &cs::SpecializationConstants {
                     constant_0: local_size,
@@ -72,8 +68,7 @@ impl ProcessingElement for Pooling {
             input_img.dimensions().height() / 2,
         );
         let output_img = utils::create_storage_image(
-            device.clone(),
-            queue.clone(),
+            ctx,
             &utils::ImageInfo {
                 width: output_size.0,
                 height: output_size.1,
@@ -87,6 +82,7 @@ impl ProcessingElement for Pooling {
         let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
         let set = PersistentDescriptorSet::new(
+            &ctx.memory.descriptor_set_allocator,
             layout.clone(),
             [
                 WriteDescriptorSet::image_view(0, input_img_view),

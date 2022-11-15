@@ -1,9 +1,7 @@
 use half::f16;
 use std::sync::Arc;
 use vulkano::{
-    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
-    device::{Device, Queue},
     format::Format,
     image::{view::ImageView, ImageAccess, StorageImage},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
@@ -13,9 +11,10 @@ use vulkano::{
 use crate::{
     endpoints::image_download::TransferredImage,
     utils::{self, ImageInfo},
+    vk_init::VkContext,
 };
 
-use super::{Io, IoFragment, ProcessingElement};
+use super::{AutoCommandBufferBuilder, Io, IoFragment, ProcessingElement};
 
 // 0th pass: canvas (power of two)
 mod cs_canvas {
@@ -88,16 +87,15 @@ impl Tracker {
     }
 
     fn canvas(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         input_img: Arc<StorageImage>,
         canvas: Canvas,
     ) -> Arc<StorageImage> {
         let pipeline = {
-            let shader = cs_canvas::load(device.clone()).unwrap();
+            let shader = cs_canvas::load(ctx.device.clone()).unwrap();
             ComputePipeline::new(
-                device.clone(),
+                ctx.device.clone(),
                 shader.entry_point("main").unwrap(),
                 &cs_canvas::SpecializationConstants {
                     ..Default::default()
@@ -126,8 +124,7 @@ impl Tracker {
 
         // output image
         let output_img = utils::create_storage_image(
-            device.clone(),
-            queue.clone(),
+            ctx,
             &ImageInfo {
                 format: Format::R8_UNORM,
                 height: pot,
@@ -141,6 +138,7 @@ impl Tracker {
         let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
         let set = PersistentDescriptorSet::new(
+            &ctx.memory.descriptor_set_allocator,
             layout.clone(),
             [
                 WriteDescriptorSet::image_view(0, input_img_view),
@@ -167,18 +165,17 @@ impl Tracker {
     }
 
     fn coordinate_mask(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         input_img: Arc<StorageImage>,
         sub_dims: &[u32; 2],
     ) -> Arc<StorageImage> {
         // ref: https://developer.nvidia.com/gpugems/gpugems3/part-iv-image-effects/chapter-26-object-detection-color-using-gpu-real-time-video
         // pipeline
         let pipeline = {
-            let shader = cs_cm::load(device.clone()).unwrap();
+            let shader = cs_cm::load(ctx.device.clone()).unwrap();
             ComputePipeline::new(
-                device.clone(),
+                ctx.device.clone(),
                 shader.entry_point("main").unwrap(),
                 &cs_cm::SpecializationConstants {
                     inv_width: 1.0 / sub_dims[0] as f32,
@@ -193,8 +190,7 @@ impl Tracker {
 
         // output image
         let output_img = utils::create_storage_image(
-            device.clone(),
-            queue.clone(),
+            ctx,
             &ImageInfo::from_image(&input_img, Format::R16G16B16A16_SFLOAT),
         );
 
@@ -204,6 +200,7 @@ impl Tracker {
         let output_img_view = ImageView::new_default(output_img.clone()).unwrap();
 
         let set = PersistentDescriptorSet::new(
+            &ctx.memory.descriptor_set_allocator,
             layout.clone(),
             [
                 WriteDescriptorSet::image_view(0, input_img_view),
@@ -230,9 +227,8 @@ impl Tracker {
     }
 
     fn pooling(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         mut input_img: Arc<StorageImage>,
         pooling_strategy: PoolingStrategy,
     ) -> Arc<StorageImage> {
@@ -246,36 +242,30 @@ impl Tracker {
         match pooling_strategy {
             PoolingStrategy::Pooling4 => {
                 for _ in 0..divs_by_4 {
-                    input_img =
-                        Self::pooling4(device.clone(), queue.clone(), builder, input_img, false);
+                    input_img = Self::pooling4(ctx, builder, input_img, false);
                 }
 
                 for _ in 0..remaining_divs_by_2 {
-                    input_img =
-                        Self::pooling2(device.clone(), queue.clone(), builder, input_img, false);
+                    input_img = Self::pooling2(ctx, builder, input_img, false);
                 }
             }
             PoolingStrategy::SampledPooling4 => {
                 for _ in 0..divs_by_4 {
-                    input_img =
-                        Self::pooling4(device.clone(), queue.clone(), builder, input_img, true);
+                    input_img = Self::pooling4(ctx, builder, input_img, true);
                 }
 
                 for _ in 0..remaining_divs_by_2 {
-                    input_img =
-                        Self::pooling2(device.clone(), queue.clone(), builder, input_img, true);
+                    input_img = Self::pooling2(ctx, builder, input_img, true);
                 }
             }
             PoolingStrategy::Pooling2 => {
                 for _ in 0..divs_by_2 {
-                    input_img =
-                        Self::pooling2(device.clone(), queue.clone(), builder, input_img, false);
+                    input_img = Self::pooling2(ctx, builder, input_img, false);
                 }
             }
             PoolingStrategy::SampledPooling2 => {
                 for _ in 0..divs_by_2 {
-                    input_img =
-                        Self::pooling2(device.clone(), queue.clone(), builder, input_img, true);
+                    input_img = Self::pooling2(ctx, builder, input_img, true);
                 }
             }
         }
@@ -284,9 +274,8 @@ impl Tracker {
     }
 
     fn pooling2(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         input_img: Arc<StorageImage>,
         use_sampler: bool,
     ) -> Arc<StorageImage> {
@@ -296,9 +285,9 @@ impl Tracker {
         let local_size = [out_size.min(16), out_size.min(16)];
 
         let pipeline = if use_sampler {
-            let shader = cs_pool2_sampler::load(device.clone()).unwrap();
+            let shader = cs_pool2_sampler::load(ctx.device.clone()).unwrap();
             ComputePipeline::new(
-                device.clone(),
+                ctx.device.clone(),
                 shader.entry_point("main").unwrap(),
                 &cs_pool2_sampler::SpecializationConstants {
                     constant_0: local_size[0],
@@ -311,9 +300,9 @@ impl Tracker {
             )
             .unwrap()
         } else {
-            let shader = cs_pool2::load(device.clone()).unwrap();
+            let shader = cs_pool2::load(ctx.device.clone()).unwrap();
             ComputePipeline::new(
-                device.clone(),
+                ctx.device.clone(),
                 shader.entry_point("main").unwrap(),
                 &cs_pool2::SpecializationConstants {
                     constant_0: local_size[0],
@@ -328,8 +317,7 @@ impl Tracker {
 
         // output image
         let output_img = utils::create_storage_image(
-            device.clone(),
-            queue.clone(),
+            ctx,
             &ImageInfo {
                 format: Format::R16G16B16A16_SFLOAT,
                 height: out_size,
@@ -344,11 +332,12 @@ impl Tracker {
 
         let set = if use_sampler {
             let sampler = Sampler::new(
-                device.clone(),
+                ctx.device.clone(),
                 SamplerCreateInfo::simple_repeat_linear_no_mipmap(),
             )
             .unwrap();
             PersistentDescriptorSet::new(
+                &ctx.memory.descriptor_set_allocator,
                 layout.clone(),
                 [
                     WriteDescriptorSet::image_view_sampler(0, input_img_view, sampler),
@@ -358,6 +347,7 @@ impl Tracker {
             .unwrap()
         } else {
             PersistentDescriptorSet::new(
+                &ctx.memory.descriptor_set_allocator,
                 layout.clone(),
                 [
                     WriteDescriptorSet::image_view(0, input_img_view),
@@ -386,9 +376,8 @@ impl Tracker {
     }
 
     fn pooling4(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         input_img: Arc<StorageImage>,
         use_sampler: bool,
     ) -> Arc<StorageImage> {
@@ -398,9 +387,9 @@ impl Tracker {
         let local_size = [out_size.min(16), out_size.min(16)];
 
         let pipeline = if use_sampler {
-            let shader = cs_pool4_sampler::load(device.clone()).unwrap();
+            let shader = cs_pool4_sampler::load(ctx.device.clone()).unwrap();
             ComputePipeline::new(
-                device.clone(),
+                ctx.device.clone(),
                 shader.entry_point("main").unwrap(),
                 &cs_pool4_sampler::SpecializationConstants {
                     constant_0: local_size[0],
@@ -413,9 +402,9 @@ impl Tracker {
             )
             .unwrap()
         } else {
-            let shader = cs_pool4::load(device.clone()).unwrap();
+            let shader = cs_pool4::load(ctx.device.clone()).unwrap();
             ComputePipeline::new(
-                device.clone(),
+                ctx.device.clone(),
                 shader.entry_point("main").unwrap(),
                 &cs_pool4::SpecializationConstants {
                     constant_0: local_size[0],
@@ -430,8 +419,7 @@ impl Tracker {
 
         // output image
         let output_img = utils::create_storage_image(
-            device.clone(),
-            queue.clone(),
+            ctx,
             &ImageInfo {
                 format: Format::R16G16B16A16_SFLOAT,
                 height: out_size,
@@ -446,11 +434,12 @@ impl Tracker {
 
         let set = if use_sampler {
             let sampler = Sampler::new(
-                device.clone(),
+                ctx.device.clone(),
                 SamplerCreateInfo::simple_repeat_linear_no_mipmap(),
             )
             .unwrap();
             PersistentDescriptorSet::new(
+                &ctx.memory.descriptor_set_allocator,
                 layout.clone(),
                 [
                     WriteDescriptorSet::image_view_sampler(0, input_img_view, sampler),
@@ -460,6 +449,7 @@ impl Tracker {
             .unwrap()
         } else {
             PersistentDescriptorSet::new(
+                &ctx.memory.descriptor_set_allocator,
                 layout.clone(),
                 [
                     WriteDescriptorSet::image_view(0, input_img_view),
@@ -491,9 +481,8 @@ impl Tracker {
 impl ProcessingElement for Tracker {
     fn build(
         &self,
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         input: &IoFragment,
     ) -> IoFragment {
         // input image
@@ -501,25 +490,18 @@ impl ProcessingElement for Tracker {
 
         // canvas the input image to be a power of two
         // this is skipped if the input image is already a POT
-        let output_img_canvas = Self::canvas(
-            device.clone(),
-            queue.clone(),
-            builder,
-            input_img.clone(),
-            self.canvas,
-        );
+        let output_img_canvas = Self::canvas(ctx, builder, input_img.clone(), self.canvas);
 
         // coordinate mask
         let output_img_cm = Self::coordinate_mask(
-            device.clone(),
-            queue.clone(),
+            ctx,
             builder,
             output_img_canvas.clone(),
             &input_img.dimensions().width_height(),
         );
 
         // scale down to 1x1 px
-        let output_img = Self::pooling(device, queue, builder, output_img_cm.clone(), self.pooling);
+        let output_img = Self::pooling(ctx, builder, output_img_cm.clone(), self.pooling);
 
         // create a descriptive label
         let label = format!(

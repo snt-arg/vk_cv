@@ -1,16 +1,35 @@
+use std::error::Error;
 use std::sync::Arc;
+use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
+use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
 use vulkano::device::physical::PhysicalDeviceType;
 use vulkano::device::{Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo};
 use vulkano::instance::{Instance, InstanceCreateInfo};
+use vulkano::memory::allocator::{
+    FreeListAllocator, GenericMemoryAllocator, StandardMemoryAllocator,
+};
 use vulkano::{Version, VulkanLibrary};
 
-pub fn init() -> (Arc<Device>, Arc<Queue>) {
+// type MemoryAllocator
+pub struct Memory {
+    pub allocator: GenericMemoryAllocator<Arc<FreeListAllocator>>,
+    pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+    pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
+}
+
+pub struct VkContext {
+    pub device: Arc<Device>,
+    pub queue: Arc<Queue>,
+    pub memory: Memory,
+}
+
+pub fn init() -> Result<VkContext, Box<dyn Error>> {
     // Note RPI4 claims VK1.1 'compliance'
     let ci = InstanceCreateInfo {
         max_api_version: Some(Version::V1_1),
         ..Default::default()
     };
-    let instance = Instance::new(VulkanLibrary::new().unwrap(), ci).unwrap();
+    let instance = Instance::new(VulkanLibrary::new().unwrap(), ci)?;
 
     // extensions
     let device_extensions = DeviceExtensions {
@@ -59,8 +78,25 @@ pub fn init() -> (Arc<Device>, Arc<Queue>) {
             }],
             ..Default::default()
         },
-    )
-    .unwrap();
+    )?;
 
-    (device, queues.next().unwrap())
+    let queue = queues.next().unwrap();
+    let allocator = StandardMemoryAllocator::new_default(device.clone());
+    let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
+        device.clone(),
+        Default::default(),
+    ));
+    let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(device.clone()));
+
+    let memory = Memory {
+        allocator,
+        command_buffer_allocator,
+        descriptor_set_allocator,
+    };
+
+    Ok(VkContext {
+        device,
+        queue,
+        memory,
+    })
 }

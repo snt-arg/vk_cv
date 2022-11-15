@@ -1,13 +1,14 @@
-use std::sync::Arc;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
-    command_buffer::{AutoCommandBufferBuilder, CopyBufferToImageInfo, PrimaryAutoCommandBuffer},
-    device::{Device, Queue},
+    command_buffer::CopyBufferToImageInfo,
 };
 
-use crate::utils::{create_storage_image, ImageInfo};
+use crate::{
+    utils::{create_storage_image, ImageInfo},
+    vk_init::VkContext,
+};
 
-use super::{Io, IoFragment, PipeInput, ProcessingElement};
+use super::{AutoCommandBufferBuilder, Io, IoFragment, PipeInput, ProcessingElement};
 
 pub struct Input {
     input_format: ImageInfo,
@@ -22,17 +23,16 @@ impl Input {
 impl ProcessingElement for Input {
     fn build(
         &self,
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        ctx: &VkContext,
+        builder: &mut AutoCommandBufferBuilder,
         _input: &IoFragment,
     ) -> IoFragment {
         // output image
-        let output_img = create_storage_image(device.clone(), queue.clone(), &self.input_format);
+        let output_img = create_storage_image(ctx, &self.input_format);
 
         let count = self.input_format.bytes_count();
         let input_buffer = CpuAccessibleBuffer::from_iter(
-            device.clone(),
+            &ctx.memory.allocator,
             BufferUsage {
                 transfer_src: true,
                 transfer_dst: true,

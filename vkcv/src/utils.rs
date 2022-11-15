@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::{fs::File, io::BufWriter, path::Path};
 
 use vulkano::command_buffer::PrimaryAutoCommandBuffer;
-use vulkano::device::{Device, Queue};
 pub use vulkano::format::Format;
 use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
 use vulkano::sync::{self, GpuFuture};
@@ -11,6 +10,7 @@ use vulkano::sync::{self, GpuFuture};
 use crate::endpoints::image_download::ImageDownload;
 use crate::processing_elements::output::Output;
 use crate::processing_elements::{IoFragment, PipeInput, PipeOutput, ProcessingElement};
+use crate::vk_init::VkContext;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ImageInfo {
@@ -160,11 +160,7 @@ pub fn write_image(image_path: &str, data: &[u8], img_info: &ImageInfo) {
     writer.write_image_data(&buffer).unwrap();
 }
 
-pub fn create_storage_image(
-    device: Arc<Device>,
-    queue: Arc<Queue>,
-    img_info: &ImageInfo,
-) -> Arc<StorageImage> {
+pub fn create_storage_image(ctx: &VkContext, img_info: &ImageInfo) -> Arc<StorageImage> {
     let usage = ImageUsage {
         storage: true,
         sampled: true,
@@ -175,7 +171,7 @@ pub fn create_storage_image(
     let flags = ImageCreateFlags::empty();
 
     StorageImage::with_usage(
-        device.clone(),
+        &ctx.memory.allocator,
         ImageDimensions::Dim2d {
             width: img_info.width,
             height: img_info.height,
@@ -184,7 +180,7 @@ pub fn create_storage_image(
         img_info.format,
         usage,
         flags,
-        Some(queue.queue_family_index()),
+        Some(ctx.queue.queue_family_index()),
     )
     .unwrap()
 }
@@ -198,8 +194,7 @@ pub fn workgroups(dimensions: &[u32; 2], local_size: &[u32; 2]) -> [u32; 3] {
 }
 
 pub fn cv_pipeline_sequential<I, O>(
-    device: Arc<Device>,
-    queue: Arc<Queue>,
+    ctx: &VkContext,
     input: &I,
     elements: &[&dyn ProcessingElement],
     output: &O,
@@ -209,40 +204,29 @@ where
     O: PipeOutput + ProcessingElement,
 {
     let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
-        device.clone(),
-        queue.queue_family_index(),
+        &ctx.memory.command_buffer_allocator,
+        ctx.queue.queue_family_index(),
         vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
     )
     .unwrap();
 
     let dummy = IoFragment::none();
-    let input_io = input.build(device.clone(), queue.clone(), &mut builder, &dummy);
+    let input_io = input.build(ctx, &mut builder, &dummy);
 
     let mut io_fragments = vec![input_io.clone()];
 
     for pe in elements {
-        io_fragments.push(pe.build(
-            device.clone(),
-            queue.clone(),
-            &mut builder,
-            io_fragments.last().as_ref().unwrap(),
-        ));
+        io_fragments.push(pe.build(ctx, &mut builder, io_fragments.last().as_ref().unwrap()));
     }
 
-    let output_io = output.build(
-        device.clone(),
-        queue.clone(),
-        &mut builder,
-        io_fragments.last().as_ref().unwrap(),
-    );
+    let output_io = output.build(ctx, &mut builder, io_fragments.last().as_ref().unwrap());
 
     let command_buffer = Arc::new(builder.build().unwrap());
     (command_buffer, input_io, output_io)
 }
 
 pub fn cv_pipeline_sequential_debug<I, O>(
-    device: Arc<Device>,
-    queue: Arc<Queue>,
+    ctx: &VkContext,
     input: &I,
     elements: &[&dyn ProcessingElement],
     output: &O,
@@ -252,38 +236,28 @@ where
     O: PipeOutput + ProcessingElement,
 {
     let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
-        device.clone(),
-        queue.queue_family_index(),
+        &ctx.memory.command_buffer_allocator,
+        ctx.queue.queue_family_index(),
         vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
     )
     .unwrap();
 
     let dummy = IoFragment::none();
-    let input_io = input.build(device.clone(), queue.clone(), &mut builder, &dummy);
+    let input_io = input.build(ctx, &mut builder, &dummy);
 
     let mut io_fragments = vec![input_io.clone()];
 
     for pe in elements {
-        io_fragments.push(pe.build(
-            device.clone(),
-            queue.clone(),
-            &mut builder,
-            io_fragments.last().as_ref().unwrap(),
-        ));
+        io_fragments.push(pe.build(ctx, &mut builder, io_fragments.last().as_ref().unwrap()));
     }
 
-    let output_io = output.build(
-        device.clone(),
-        queue.clone(),
-        &mut builder,
-        io_fragments.last().as_ref().unwrap(),
-    );
+    let output_io = output.build(ctx, &mut builder, io_fragments.last().as_ref().unwrap());
 
     // create generic outputs for each io element in the pipeline
     let generic_output = Output::new();
     let generic_output_ios: Vec<_> = io_fragments
         .iter()
-        .map(|io| generic_output.build(device.clone(), queue.clone(), &mut builder, io))
+        .map(|io| generic_output.build(ctx, &mut builder, io))
         .collect();
 
     // finalize the command buffer
@@ -295,15 +269,14 @@ where
     let mut individual_cbs = vec![];
     for pe in elements {
         let mut builder = vulkano::command_buffer::AutoCommandBufferBuilder::primary(
-            device.clone(),
-            queue.queue_family_index(),
+            &ctx.memory.command_buffer_allocator,
+            ctx.queue.queue_family_index(),
             vulkano::command_buffer::CommandBufferUsage::MultipleSubmit,
         )
         .unwrap();
 
         let io = pe.build(
-            device.clone(),
-            queue.clone(),
+            ctx,
             &mut builder,
             indiv_io_elements.last().as_ref().unwrap(),
         );
@@ -334,9 +307,9 @@ pub struct DebugPipeline {
 }
 
 impl DebugPipeline {
-    pub fn dispatch(&self, device: Arc<Device>, queue: Arc<Queue>) {
-        let future = sync::now(device.clone())
-            .then_execute(queue.clone(), self.cb.clone())
+    pub fn dispatch(&self, ctx: &VkContext) {
+        let future = sync::now(ctx.device.clone())
+            .then_execute(ctx.queue.clone(), self.cb.clone())
             .unwrap()
             .then_signal_fence_and_flush()
             .unwrap();
@@ -344,10 +317,10 @@ impl DebugPipeline {
         future.wait(None).unwrap();
     }
 
-    pub fn time(&self, device: Arc<Device>, queue: Arc<Queue>) {
+    pub fn time(&self, ctx: &VkContext) {
         for (i, cb) in self.individual_cbs.iter().enumerate() {
-            let future = sync::now(device.clone())
-                .then_execute(queue.clone(), cb.clone())
+            let future = sync::now(ctx.device.clone())
+                .then_execute(ctx.queue.clone(), cb.clone())
                 .unwrap()
                 .then_signal_fence_and_flush()
                 .unwrap();
@@ -365,8 +338,8 @@ impl DebugPipeline {
         }
     }
 
-    pub fn save_all(&self, device: Arc<Device>, queue: Arc<Queue>, dir: &str, prefix: &str) {
-        self.dispatch(device, queue);
+    pub fn save_all(&self, ctx: &VkContext, dir: &str, prefix: &str) {
+        self.dispatch(ctx);
         std::fs::create_dir_all(dir).unwrap();
         for (i, io) in self.debug_outputs.iter().enumerate() {
             let mut download = ImageDownload::from_io(io.clone()).unwrap();

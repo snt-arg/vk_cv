@@ -75,7 +75,7 @@ fn main() -> Result<()> {
     let img_info = camera.fetch_image(false).0.image_info();
 
     // init device
-    let (device, queue) = vk_init::init();
+    let ctx = vk_init::init().unwrap();
 
     // create a color tracking pipeline
     let pe_input = Input::new(img_info);
@@ -88,8 +88,7 @@ fn main() -> Result<()> {
     let pe_out = Output::new();
 
     let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(
-        device.clone(),
-        queue.clone(),
+        &ctx,
         &pe_input,
         &[
             &pe_hsv,
@@ -103,8 +102,7 @@ fn main() -> Result<()> {
     );
 
     let pipeline_dbg = cv_pipeline_sequential_debug(
-        device.clone(),
-        queue.clone(),
+        &ctx,
         &pe_input,
         &[
             &pe_hsv,
@@ -125,8 +123,8 @@ fn main() -> Result<()> {
     // train
     for i in 0..30 {
         // process on GPU
-        let future = sync::now(device.clone())
-            .then_execute(queue.clone(), pipeline_cb.clone())
+        let future = sync::now(ctx.device.clone())
+            .then_execute(ctx.queue.clone(), pipeline_cb.clone())
             .unwrap()
             .then_signal_fence_and_flush()
             .unwrap();
@@ -168,8 +166,8 @@ fn main() -> Result<()> {
         upload.copy_input_data(color_image.data_slice());
 
         // process on GPU
-        let future = sync::now(device.clone())
-            .then_execute(queue.clone(), pipeline_cb.clone())
+        let future = sync::now(ctx.device.clone())
+            .then_execute(ctx.queue.clone(), pipeline_cb.clone())
             .unwrap()
             .then_signal_fence_and_flush()
             .unwrap();
@@ -239,18 +237,13 @@ fn main() -> Result<()> {
         // break down the cost of the individual stages
         if DBG_PROFILE && frame % 30 == 0 {
             // time the execution of the individual stages
-            pipeline_dbg.time(device.clone(), queue.clone());
+            pipeline_dbg.time(&ctx);
 
             // save a snapshot of all stages in the pipeline
             let upload = ImageUpload::from_io(pipeline_dbg.input.clone()).unwrap();
             upload.copy_input_data(color_image.data_slice());
             let prefix = std::time::Instant::now().duration_since(start_of_program);
-            pipeline_dbg.save_all(
-                device.clone(),
-                queue.clone(),
-                "out",
-                &format!("{}-", prefix.as_millis()),
-            );
+            pipeline_dbg.save_all(&ctx, "out", &format!("{}-", prefix.as_millis()));
         }
 
         // print stats

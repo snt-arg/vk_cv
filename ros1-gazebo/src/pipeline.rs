@@ -63,7 +63,7 @@ pub fn process_blocking(
     println!("CV: Realsense camera tracker");
 
     // init device
-    let (device, queue) = vk_init::init();
+    let ctx = vk_init::init().unwrap();
 
     // get image info
     let img_info = ImageInfo {
@@ -93,8 +93,7 @@ pub fn process_blocking(
     let pe_out = Output::new();
 
     let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(
-        device.clone(),
-        queue.clone(),
+        &ctx,
         &pe_input,
         &[
             &pe_hsv,
@@ -121,8 +120,8 @@ pub fn process_blocking(
         upload.copy_input_data(&color_frame.1);
 
         // process on GPU
-        let future = sync::now(device.clone())
-            .then_execute(queue.clone(), pipeline_cb.clone())
+        let future = sync::now(ctx.device.clone())
+            .then_execute(ctx.queue.clone(), pipeline_cb.clone())
             .unwrap()
             .then_signal_fence_and_flush()
             .unwrap();
