@@ -80,17 +80,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // vkcv processing thread
-    let vkcv_handle = tokio::task::spawn_blocking(move || {
-        match pipeline::process_blocking(
+    let vkcv_handle = tokio::task::spawn(async move {
+        pipeline::process_blocking(
             cv_config,
             cv_point3_tx,
             cv_image_tx,
             cv_depth_image_tx,
             exit_rx,
-        ) {
-            Err(_) => println!("Cannot open camera"),
-            _ => (),
-        }
+        )
+        .await
+        .unwrap()
     });
 
     // setup jpeg compressor
@@ -179,7 +178,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     rosrust::spin();
     println!("exit ros node, wait for threads to finish...");
     exit_tx.send(true).unwrap();
-    tokio::join!(main_handle, vkcv_handle);
+    tokio::join!(main_handle, vkcv_handle).0.unwrap();
     println!("exit threads");
 
     Ok(())

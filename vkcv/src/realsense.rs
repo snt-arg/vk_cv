@@ -563,3 +563,7 @@ impl<'a> Drop for DepthFramePromise<'a> {
         }
     }
 }
+
+unsafe impl<'a> Send for DepthFramePromise<'a> {}
+unsafe impl Send for ColorFrame {}
+unsafe impl Send for Realsense {}

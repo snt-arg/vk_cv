@@ -1,4 +1,4 @@
-use std::sync::mpsc::Receiver;
+use std::{error::Error, sync::mpsc::Receiver};
 
 use crate::msg;
 use vkcv::{
@@ -54,13 +54,13 @@ impl Default for Config {
     }
 }
 
-pub fn process_blocking(
+pub async fn process_blocking(
     config: Config,
     sender_point3: UnboundedSender<Point3>,
     sender_image: UnboundedSender<OwnedImage>,
     sender_depth_image: UnboundedSender<OwnedImage>,
     exit_signal: Receiver<bool>,
-) -> anyhow::Result<()> {
+) -> Result<(), Box<dyn Error + Sync + Send>> {
     println!("CV: Realsense camera tracker");
 
     // set the default display, otherwise we fallback to llvmpipe
@@ -73,8 +73,7 @@ pub fn process_blocking(
         "CV: Opening camera ({}x{}@{}fps)",
         resolution[0], resolution[1], target_fps
     );
-    let mut camera = Realsense::open(&resolution, target_fps, &resolution, target_fps)
-        .map_err(anyhow::Error::msg)?;
+    let mut camera = Realsense::open(&resolution, target_fps, &resolution, target_fps)?;
 
     // grab a couple of frames
     for _ in 0..5 {
@@ -163,7 +162,7 @@ pub fn process_blocking(
 
         // wait till finished
         std::thread::sleep(avg_pipeline_execution_duration); // the results are likely ready after we wake up
-        future.wait(None).unwrap(); // spin-lock?
+        future.await?; // spin-lock?
 
         // print results
         let (c, area) = tracker::centroid(&download.transfer());
