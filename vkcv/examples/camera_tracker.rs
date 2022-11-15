@@ -224,7 +224,7 @@ fn main() -> Result<()> {
                         format: vulkano::format::Format::R8G8B8A8_UINT,
                     },
                 };
-                draw_centroid(&mut owned_image, &pixel_coords);
+                draw_centroid(&mut owned_image, &pixel_coords, 2.0);
                 utils::write_image(
                     &format!("out/centroid-{}", frame),
                     &owned_image.buffer,

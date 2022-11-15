@@ -198,7 +198,7 @@ pub async fn process_blocking(
 
             // draw centroid
             if config.process_image {
-                draw_centroid(&mut owned_image, &pixel_coords);
+                draw_centroid(&mut owned_image, &pixel_coords, 2.0);
             }
 
             // de-project to obtain a 3D point in camera coordinates
