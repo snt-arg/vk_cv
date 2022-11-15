@@ -1,7 +1,6 @@
 use eframe::egui;
 use egui::{Color32, ColorImage};
 use egui_extras::RetainedImage;
-use pipeline::Pipeline;
 
 mod pipeline;
 
@@ -12,7 +11,7 @@ fn main() {
     };
 
     eframe::run_native(
-        "Show an image with eframe/egui",
+        "vkcv viewer",
         options,
         Box::new(|_cc| Box::new(MyApp::default())),
     );
@@ -20,7 +19,6 @@ fn main() {
 
 struct MyApp {
     image: RetainedImage,
-    tint: egui::Color32,
     pipeline: pipeline::Pipeline,
 }
 
@@ -29,9 +27,8 @@ impl Default for MyApp {
         Self {
             image: RetainedImage::from_color_image(
                 "",
-                ColorImage::new([100, 100], Color32::from_rgb(0, 0, 0)),
+                ColorImage::new([32, 32], Color32::from_rgb(0, 0, 0)),
             ),
-            tint: egui::Color32::from_rgb(255, 0, 255),
             pipeline: pipeline::init(),
         }
     }
