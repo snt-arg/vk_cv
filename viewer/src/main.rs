@@ -1,6 +1,7 @@
 use eframe::egui;
 use egui::{Color32, ColorImage};
 use egui_extras::RetainedImage;
+use pipeline::Config;
 use vkcv::utils::image_to_rgba8;
 
 mod pipeline;
@@ -21,6 +22,7 @@ fn main() {
 struct MyApp {
     image: RetainedImage,
     pipeline: pipeline::Pipeline,
+    pipeline_cfg: Config,
 }
 
 impl Default for MyApp {
@@ -30,7 +32,8 @@ impl Default for MyApp {
                 "",
                 ColorImage::new([32, 32], Color32::from_rgb(0, 0, 0)),
             ),
-            pipeline: pipeline::init(),
+            pipeline: pipeline::Pipeline::new(),
+            pipeline_cfg: Default::default(),
         }
     }
 }
@@ -38,21 +41,47 @@ impl Default for MyApp {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("pipeline output");
-            self.image.show(ui);
+            let mut recreate_pipeline = false;
 
             let res = self.pipeline.fetch_and_process();
 
-            self.image = RetainedImage::from_color_image(
-                "",
-                ColorImage::from_rgba_unmultiplied(
-                    [
-                        res.image.info.width as usize,
-                        res.image.info.height as usize,
-                    ],
-                    &res.image.buffer,
-                ),
-            );
+            ui.heading("pipeline output");
+
+            ui.horizontal(|ui| {
+                self.image = RetainedImage::from_color_image(
+                    "",
+                    ColorImage::from_rgba_unmultiplied(
+                        [
+                            res.image.info.width as usize,
+                            res.image.info.height as usize,
+                        ],
+                        &res.image.buffer,
+                    ),
+                );
+                self.image.show(ui);
+
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("MSV min");
+                        if ui
+                            .color_edit_button_hsva(&mut self.pipeline_cfg.hsv_min)
+                            .changed()
+                        {
+                            recreate_pipeline = true;
+                        }
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("MSV max");
+                        if ui
+                            .color_edit_button_hsva(&mut self.pipeline_cfg.hsv_max)
+                            .changed()
+                        {
+                            recreate_pipeline = true;
+                        }
+                    });
+                });
+            });
 
             match res.target_pos {
                 Some(point) => ui.heading(format!(
@@ -81,6 +110,10 @@ impl eframe::App for MyApp {
                     input_image.show(ui);
                 }
             });
+
+            if recreate_pipeline {
+                self.pipeline.reconfigure(&self.pipeline_cfg);
+            }
 
             ctx.request_repaint();
         });

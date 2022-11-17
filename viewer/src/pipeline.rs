@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use egui::color::Hsva;
 use vkcv::{
     draw::{draw_centroid, OwnedImage},
     endpoints::{image_download::ImageDownload, image_upload::ImageUpload},
@@ -13,7 +14,6 @@ use vkcv::{
         tracker::{self, Canvas, PoolingStrategy, Tracker},
     },
     realsense::Realsense,
-    utils::cv_pipeline_sequential,
     utils::{cv_pipeline_sequential_with_taps, ImageInfo},
     vk_init::{self, VkContext},
     vulkano::command_buffer::PrimaryAutoCommandBuffer,
@@ -21,64 +21,118 @@ use vkcv::{
 
 use vkcv::vulkano::sync::{self, GpuFuture};
 
+#[derive(Debug, Clone, Copy)]
+pub struct Config {
+    pub hsv_min: Hsva,
+    pub hsv_max: Hsva,
+    pub min_area: u32,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            hsv_min: Hsva::new(0.3, 0.6, 0.239, 1.0),
+            hsv_max: Hsva::new(0.5, 1.0, 1.0, 1.0),
+            min_area: 4 * 4,
+        }
+    }
+}
+
 pub struct Pipeline {
     upload: ImageUpload,
     pub download: Vec<ImageDownload>,
     ctx: VkContext,
     cam: Realsense,
     cb: Arc<PrimaryAutoCommandBuffer>,
+    img_info: ImageInfo,
 }
 
-pub fn init() -> Pipeline {
-    let res = [640, 480];
-    let fps = 60;
-    let mut camera = Realsense::open(&res, fps, &res, fps).unwrap();
+impl Pipeline {
+    pub fn new() -> Pipeline {
+        let res = [640, 480];
+        let fps = 60;
+        let mut camera = Realsense::open(&res, fps, &res, fps).unwrap();
 
-    // grab a couple of frames
-    for _ in 0..5 {
-        camera.fetch_image(false);
+        // grab a couple of frames
+        for _ in 0..5 {
+            camera.fetch_image(false);
+        }
+
+        let img_info = camera.fetch_image(false).0.image_info();
+
+        // init device
+        let ctx = vk_init::init().unwrap();
+
+        // create a color tracking pipeline
+        let pe_input = Input::new(img_info);
+        let pe_hsv = Hsvconv::new();
+        let pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
+        let pe_erode = Morphology::new(Operation::Erode);
+        let pe_dilate = Morphology::new(Operation::Dilate);
+        let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
+        let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
+
+        let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential_with_taps::<_, Output>(
+            &ctx,
+            &pe_input,
+            &[
+                &pe_hsv,
+                &pe_hsv_filter,
+                &pe_erode,
+                &pe_dilate,
+                &pe_pooling,
+                &pe_tracker,
+            ],
+        );
+
+        let upload = ImageUpload::from_io(input_io).unwrap();
+        let download = output_io
+            .iter()
+            .map(|io| ImageDownload::from_io(io.clone()).unwrap())
+            .collect();
+
+        Pipeline {
+            upload,
+            download,
+            ctx,
+            cam: camera,
+            cb: pipeline_cb,
+            img_info,
+        }
     }
 
-    let img_info = camera.fetch_image(false).0.image_info();
+    pub fn reconfigure(&mut self, cfg: &Config) {
+        // create a color tracking pipeline
+        let pe_input = Input::new(self.img_info);
+        let pe_hsv = Hsvconv::new();
+        let pe_hsv_filter = ColorFilter::new(
+            [cfg.hsv_min.h, cfg.hsv_min.s, cfg.hsv_min.v],
+            [cfg.hsv_max.h, cfg.hsv_max.s, cfg.hsv_max.v],
+        );
+        let pe_erode = Morphology::new(Operation::Erode);
+        let pe_dilate = Morphology::new(Operation::Dilate);
+        let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
+        let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
 
-    // init device
-    let ctx = vk_init::init().unwrap();
+        let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential_with_taps::<_, Output>(
+            &self.ctx,
+            &pe_input,
+            &[
+                &pe_hsv,
+                &pe_hsv_filter,
+                &pe_erode,
+                &pe_dilate,
+                &pe_pooling,
+                &pe_tracker,
+            ],
+        );
+        self.cb = pipeline_cb;
 
-    // create a color tracking pipeline
-    let pe_input = Input::new(img_info);
-    let pe_hsv = Hsvconv::new();
-    let pe_hsv_filter = ColorFilter::new([0.20, 0.4, 0.239], [0.429, 1.0, 1.0]);
-    let pe_erode = Morphology::new(Operation::Erode);
-    let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
-    let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
-    let pe_out = Output::new();
-
-    let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential_with_taps::<_, Output>(
-        &ctx,
-        &pe_input,
-        &[
-            &pe_hsv,
-            &pe_hsv_filter,
-            &pe_erode,
-            &pe_dilate,
-            &pe_pooling,
-            &pe_tracker,
-        ],
-    );
-
-    let upload = ImageUpload::from_io(input_io).unwrap();
-    let download = output_io
-        .iter()
-        .map(|io| ImageDownload::from_io(io.clone()).unwrap())
-        .collect();
-
-    Pipeline {
-        upload,
-        download,
-        ctx,
-        cam: camera,
-        cb: pipeline_cb,
+        self.upload = ImageUpload::from_io(input_io).unwrap();
+        self.download = output_io
+            .iter()
+            .map(|io| ImageDownload::from_io(io.clone()).unwrap())
+            .collect();
     }
 }
 
