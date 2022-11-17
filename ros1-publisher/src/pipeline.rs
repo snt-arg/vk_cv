@@ -1,4 +1,7 @@
-use std::{error::Error, sync::mpsc::Receiver};
+use std::{
+    error::Error,
+    sync::{mpsc::Receiver, Arc},
+};
 
 use crate::msg;
 use vkcv::{
@@ -15,9 +18,10 @@ use vkcv::{
     },
     realsense::Realsense,
     utils::{cv_pipeline_sequential, ImageInfo},
-    vk_init,
+    vk_init::{self, VkContext},
     vulkano::{
         self,
+        command_buffer::PrimaryAutoCommandBuffer,
         sync::{self, GpuFuture},
     },
 };
@@ -54,118 +58,109 @@ impl Default for Config {
     }
 }
 
-pub async fn process_blocking(
+pub struct Pipeline {
     config: Config,
     sender_point3: UnboundedSender<Point3>,
     sender_image: UnboundedSender<OwnedImage>,
     sender_depth_image: UnboundedSender<OwnedImage>,
-    exit_signal: Receiver<bool>,
-) -> Result<(), Box<dyn Error + Sync + Send>> {
-    println!("CV: Realsense camera tracker");
+    camera: Realsense,
 
-    // set the default display, otherwise we fallback to llvmpipe
-    // std::env::set_var("DISPLAY", ":0");
-    // std::env::set_var("V3D_DEBUG", "perf");
+    pipeline_cb: Arc<PrimaryAutoCommandBuffer>,
+    upload: ImageUpload,
+    download: ImageDownload,
+    ctx: VkContext,
+}
 
-    let resolution = [640, 480];
-    let target_fps = 30;
-    println!(
-        "CV: Opening camera ({}x{}@{}fps)",
-        resolution[0], resolution[1], target_fps
-    );
-    let mut camera = Realsense::open(&resolution, target_fps, &resolution, target_fps)?;
+impl Pipeline {
+    pub fn new(
+        config: Config,
+        sender_point3: UnboundedSender<Point3>,
+        sender_image: UnboundedSender<OwnedImage>,
+        sender_depth_image: UnboundedSender<OwnedImage>,
+    ) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        println!("CV: Realsense camera tracker");
 
-    // grab a couple of frames
-    for _ in 0..5 {
-        camera.fetch_image(false);
-    }
+        // set the default display, otherwise we fallback to llvmpipe
+        // std::env::set_var("DISPLAY", ":0");
+        // std::env::set_var("V3D_DEBUG", "perf");
 
-    let img_info = camera.fetch_image(false).0.image_info();
+        let resolution = [640, 480];
+        let target_fps = 30;
+        println!(
+            "CV: Opening camera ({}x{}@{}fps)",
+            resolution[0], resolution[1], target_fps
+        );
+        let mut camera = Realsense::open(&resolution, target_fps, &resolution, target_fps)?;
 
-    // init device
-    let ctx = vk_init::init().unwrap();
-
-    // create a color tracking pipeline
-    let pe_input = Input::new(img_info);
-    let pe_hsv = Hsvconv::new();
-    let pe_hsv_filter = ColorFilter::new(config.hsv_min, config.hsv_max);
-    let pe_erode = Morphology::new(Operation::Erode);
-    let pe_dilate = Morphology::new(Operation::Dilate);
-    let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
-    let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
-    let pe_out = Output::new();
-
-    let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(
-        &ctx,
-        &pe_input,
-        &[
-            &pe_hsv,
-            &pe_hsv_filter,
-            &pe_erode,
-            &pe_dilate,
-            &pe_pooling,
-            &pe_tracker,
-        ],
-        &pe_out,
-    );
-
-    let upload = ImageUpload::from_io(input_io).unwrap();
-    let mut download = ImageDownload::from_io(output_io).unwrap();
-
-    let mut avg_pipeline_execution_duration = std::time::Duration::ZERO;
-
-    // train
-    for i in 0..30 {
-        // process on GPU
-        let future = sync::now(ctx.device.clone())
-            .then_execute(ctx.queue.clone(), pipeline_cb.clone())
-            .unwrap()
-            .then_signal_fence_and_flush()
-            .unwrap();
-
-        let pipeline_committed = std::time::Instant::now();
-
-        // wait till finished
-        future.wait(None).unwrap();
-
-        if i >= 10 {
-            if avg_pipeline_execution_duration.is_zero() {
-                avg_pipeline_execution_duration = std::time::Instant::now() - pipeline_committed;
-            }
-
-            avg_pipeline_execution_duration = std::time::Duration::from_secs_f32(
-                avg_pipeline_execution_duration.as_secs_f32() * 0.9
-                    + 0.1 * (std::time::Instant::now() - pipeline_committed).as_secs_f32(),
-            );
+        // grab a couple of frames
+        for _ in 0..5 {
+            camera.fetch_image(false);
         }
+
+        let img_info = camera.fetch_image(false).0.image_info();
+
+        // init device
+        let ctx = vk_init::init().unwrap();
+
+        // create a color tracking pipeline
+        let pe_input = Input::new(img_info);
+        let pe_hsv = Hsvconv::new();
+        let pe_hsv_filter = ColorFilter::new(config.hsv_min, config.hsv_max);
+        let pe_erode = Morphology::new(Operation::Erode);
+        let pe_dilate = Morphology::new(Operation::Dilate);
+        let pe_tracker = Tracker::new(PoolingStrategy::Pooling4, Canvas::Pad);
+        let pe_pooling = Pooling::new(pooling::Operation::Max); // 2x2
+        let pe_out = Output::new();
+
+        let (pipeline_cb, input_io, output_io) = cv_pipeline_sequential(
+            &ctx,
+            &pe_input,
+            &[
+                &pe_hsv,
+                &pe_hsv_filter,
+                &pe_erode,
+                &pe_dilate,
+                &pe_pooling,
+                &pe_tracker,
+            ],
+            &pe_out,
+        );
+
+        let upload = ImageUpload::from_io(input_io).unwrap();
+        let download = ImageDownload::from_io(output_io).unwrap();
+
+        Ok(Self {
+            config,
+            sender_point3,
+            sender_image,
+            sender_depth_image,
+            pipeline_cb,
+            upload,
+            download,
+            camera,
+            ctx,
+        })
     }
 
-    println!(
-        "CV: Average duration: {} ms",
-        avg_pipeline_execution_duration.as_millis()
-    );
-
-    println!("CV: Entering main loop");
-    loop {
+    pub async fn receive_image(&mut self) -> Result<(), Box<dyn Error + Sync + Send>> {
         // grab depth and color image from the realsense
-        let (color_image, depth_image) = camera.fetch_image(true);
+        let (color_image, depth_image) = self.camera.fetch_image(true);
 
         // upload image to GPU
-        upload.copy_input_data(color_image.data_slice());
+        self.upload.copy_input_data(color_image.data_slice());
 
         // process on GPU
-        let future = sync::now(ctx.device.clone())
-            .then_execute(ctx.queue.clone(), pipeline_cb.clone())
+        let future = sync::now(self.ctx.device.clone())
+            .then_execute(self.ctx.queue.clone(), self.pipeline_cb.clone())
             .unwrap()
             .then_signal_fence_and_flush()
             .unwrap();
 
         // wait till finished
-        std::thread::sleep(avg_pipeline_execution_duration); // the results are likely ready after we wake up
-        future.await?; // spin-lock?
+        future.await?;
 
         // print results
-        let (c, area) = tracker::centroid(&download.transfer());
+        let (c, area) = tracker::centroid(&self.download.transfer());
         let area_px = (area * color_image.area() as f32) as u32;
 
         // owned image
@@ -182,14 +177,16 @@ pub async fn process_blocking(
         let depth_image = depth_image.get();
 
         // get the depth only if our object is bigger than 225px² (15x15)
-        if area_px > config.min_area {
+        if area_px > self.config.min_area {
             let pixel_coords = [
                 c[0] * color_image.width() as f32,
                 c[1] * color_image.height() as f32,
             ];
-            let depth = camera.depth_at_pixel(&pixel_coords, &color_image, &depth_image);
+            let depth = self
+                .camera
+                .depth_at_pixel(&pixel_coords, &color_image, &depth_image);
 
-            if config.verbose {
+            if self.config.verbose {
                 println!(
                     "px coords {}, {}\tdepth {:?}m",
                     pixel_coords[0], pixel_coords[1], depth
@@ -197,17 +194,19 @@ pub async fn process_blocking(
             }
 
             // draw centroid
-            if config.process_image {
+            if self.config.process_image {
                 draw_centroid(&mut owned_image, &pixel_coords, 2.0);
             }
 
             // de-project to obtain a 3D point in camera coordinates
             if let Some(depth) = depth {
-                let point = camera.deproject_pixel(&pixel_coords, depth, &color_image);
+                let point = self
+                    .camera
+                    .deproject_pixel(&pixel_coords, depth, &color_image);
 
                 // ignore this measurement if we hit a hole in the depth image
                 if point[2] > 0.0 && rosrust::is_ok() {
-                    sender_point3
+                    self.sender_point3
                         .send(Point3 {
                             x: point[0] as f64,
                             y: point[1] as f64,
@@ -219,16 +218,16 @@ pub async fn process_blocking(
         }
 
         // send image
-        if config.transmit_image {
+        if self.config.transmit_image {
             if rosrust::is_ok() {
-                sender_image
+                self.sender_image
                     .send(owned_image)
                     .expect("Failed to transmit image");
             }
         }
 
         // send depth image
-        if config.transmit_depth_image {
+        if self.config.transmit_depth_image {
             // convert from monochrome to rgb format
             let owned_image = OwnedImage {
                 buffer: depth_image.to_owned_rgb(),
@@ -240,15 +239,12 @@ pub async fn process_blocking(
             };
 
             if rosrust::is_ok() {
-                sender_depth_image
+                self.sender_depth_image
                     .send(owned_image)
                     .expect("Failed to transmit image");
             }
         }
 
-        if let Ok(_) = exit_signal.try_recv() {
-            println!("exit camera thread");
-            return Ok(());
-        }
+        Ok(())
     }
 }

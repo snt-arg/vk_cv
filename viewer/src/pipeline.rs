@@ -89,72 +89,73 @@ pub struct PipelineResult {
     pub dt: std::time::Duration,
 }
 
-pub fn fetch_and_process(p: &mut Pipeline) -> PipelineResult {
-    // grab depth and color image from the realsense
-    let (color_image, depth_image) = p.cam.fetch_image(true);
-    let t0 = std::time::Instant::now();
+impl Pipeline {
+    pub fn fetch_and_process(&mut self) -> PipelineResult {
+        // grab depth and color image from the realsense
+        let (color_image, depth_image) = self.cam.fetch_image(true);
+        let t0 = std::time::Instant::now();
 
-    // upload image to GPU
-    p.upload.copy_input_data(color_image.data_slice());
+        // upload image to GPU
+        self.upload.copy_input_data(color_image.data_slice());
 
-    // process on GPU
-    let future = sync::now(p.ctx.device.clone())
-        .then_execute(p.ctx.queue.clone(), p.cb.clone())
-        .unwrap()
-        .then_signal_fence_and_flush()
-        .unwrap();
+        // process on GPU
+        let future = sync::now(self.ctx.device.clone())
+            .then_execute(self.ctx.queue.clone(), self.cb.clone())
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap();
 
-    // wait till finished
-    future.wait(None).unwrap(); // spin-lock?
-    let dt = std::time::Instant::now().duration_since(t0);
+        // wait till finished
+        future.wait(None).unwrap(); // spin-lock?
+        let dt = std::time::Instant::now().duration_since(t0);
 
-    // get processed depth image
-    let depth_image = depth_image.get();
+        // get processed depth image
+        let depth_image = depth_image.get();
 
-    // transfer all images to host
-    for dl in &mut p.download {
-        dl.transfer();
-    }
-
-    // print results
-    let tf_image = p.download.last_mut().unwrap().transferred_image();
-    let (c, area) = tracker::centroid(&tf_image);
-    let area_px = (area * color_image.area() as f32) as u32;
-
-    // get the depth only if our object is bigger than 225px² (15x15)
-    let mut owned_image = OwnedImage {
-        buffer: color_image.data_slice().to_vec(),
-        info: ImageInfo {
-            width: color_image.width(),
-            height: color_image.height(),
-            format: vkcv::vulkano::format::Format::R8G8B8A8_UINT,
-        },
-    };
-
-    let mut point = None;
-
-    if area_px > 16 {
-        let pixel_coords = [
-            c[0] * color_image.width() as f32,
-            c[1] * color_image.height() as f32,
-        ];
-        let depth = p
-            .cam
-            .depth_at_pixel(&pixel_coords, &color_image, &depth_image);
-
-        // de-project to obtain a 3D point in camera coordinates
-        if let Some(depth) = depth {
-            point = Some(p.cam.deproject_pixel(&pixel_coords, depth, &color_image));
+        // transfer all images to host
+        for dl in &mut self.download {
+            dl.transfer();
         }
 
-        // paint the centroid
-        draw_centroid(&mut owned_image, &pixel_coords, 2.0);
-    }
+        // print results
+        let tf_image = self.download.last_mut().unwrap().transferred_image();
+        let (c, area) = tracker::centroid(&tf_image);
+        let area_px = (area * color_image.area() as f32) as u32;
 
-    PipelineResult {
-        image: owned_image,
-        target_pos: point,
-        area: area_px,
-        dt,
+        let mut owned_image = OwnedImage {
+            buffer: color_image.data_slice().to_vec(),
+            info: ImageInfo {
+                width: color_image.width(),
+                height: color_image.height(),
+                format: vkcv::vulkano::format::Format::R8G8B8A8_UINT,
+            },
+        };
+
+        // get the depth only if our object is bigger than a certain threshold
+        let mut point = None;
+        if area_px > 16 {
+            let pixel_coords = [
+                c[0] * color_image.width() as f32,
+                c[1] * color_image.height() as f32,
+            ];
+            let depth = self
+                .cam
+                .depth_at_pixel(&pixel_coords, &color_image, &depth_image);
+
+            // de-project to obtain a 3D point in camera coordinates
+            if let Some(depth) = depth {
+                point = Some(self.cam.deproject_pixel(&pixel_coords, depth, &color_image));
+            }
+
+            // paint the centroid
+            draw_centroid(&mut owned_image, &pixel_coords, 2.0);
+        }
+
+        PipelineResult {
+            image: owned_image,
+            target_pos: point,
+            area: area_px,
+            dt,
+        }
     }
 }

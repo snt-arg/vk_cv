@@ -41,7 +41,7 @@ impl eframe::App for MyApp {
             ui.heading("pipeline output");
             self.image.show(ui);
 
-            let res = pipeline::fetch_and_process(&mut self.pipeline);
+            let res = self.pipeline.fetch_and_process();
 
             self.image = RetainedImage::from_color_image(
                 "",

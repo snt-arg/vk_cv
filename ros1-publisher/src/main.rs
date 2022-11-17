@@ -67,8 +67,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let lock_pub = rosrust::publish::<pipeline::Bool>("/vkcv/lock", 1)?;
 
-    let (exit_tx, exit_rx) = std::sync::mpsc::channel();
-
     // setup vkcv
     let cv_config = pipeline::Config {
         transmit_image: opt.transmit_image,
@@ -79,18 +77,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    // vkcv processing thread
-    let vkcv_handle = tokio::task::spawn(async move {
-        pipeline::process_blocking(
-            cv_config,
-            cv_point3_tx,
-            cv_image_tx,
-            cv_depth_image_tx,
-            exit_rx,
-        )
-        .await
-        .unwrap()
-    });
+    let mut pipeline =
+        pipeline::Pipeline::new(cv_config, cv_point3_tx, cv_image_tx, cv_depth_image_tx).unwrap();
 
     // setup jpeg compressor
     let mut compressor = Compressor::new()?;
@@ -100,7 +88,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lock_ticker = tokio::time::interval(std::time::Duration::from_millis(250));
 
     // publishing thread
-    let exit_tx_main = exit_tx.clone();
     let main_handle = tokio::task::spawn(async move {
         let mut last_seen = None;
 
@@ -125,6 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         return;
                     }
                 },
+                Err(err) = pipeline.receive_image() => { dbg!(err); }
                 Some(msg) = cv_point3_rx.recv() => {
                     last_seen = Some(std::time::Instant::now());
                     point_pub.send(msg).expect("Failed to send '~/local_point'");
@@ -167,8 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Ok(_) = signal::ctrl_c() => {
-                    exit_tx_main.send(true).unwrap();
-                    return; // exit thread
+                    break; // exit thread
                 }
             }
         }
@@ -177,8 +164,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // keep running (blocking)
     rosrust::spin();
     println!("exit ros node, wait for threads to finish...");
-    exit_tx.send(true).unwrap();
-    tokio::join!(main_handle, vkcv_handle).0.unwrap();
+    tokio::join!(main_handle).0.unwrap();
     println!("exit threads");
 
     Ok(())
