@@ -8,7 +8,7 @@ mod pipeline;
 
 fn main() {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(500.0, 900.0)),
+        initial_window_size: Some(egui::vec2(800.0, 900.0)),
         ..Default::default()
     };
 
@@ -46,6 +46,13 @@ impl eframe::App for MyApp {
             let res = self.pipeline.fetch_and_process();
 
             ui.heading("pipeline output");
+            ui.label(format!(
+                "{}x{}x{}, {:?}",
+                res.image.info.width,
+                res.image.info.height,
+                res.image.info.bytes_per_pixel(),
+                res.image.info.format
+            ));
 
             ui.horizontal(|ui| {
                 self.image = RetainedImage::from_color_image(
@@ -98,6 +105,13 @@ impl eframe::App for MyApp {
             egui::ScrollArea::new([false, true]).show(ui, |ui| {
                 for dl in &self.pipeline.download {
                     let input_image = dl.transferred_image();
+                    ui.label(format!(
+                        "{}x{}x{}, {:?}",
+                        input_image.info().width,
+                        input_image.info().height,
+                        input_image.info().bytes_per_pixel(),
+                        input_image.info().format
+                    ));
                     let (info, rgba) =
                         image_to_rgba8(input_image.info(), input_image.buffer_content());
                     let input_image = RetainedImage::from_color_image(

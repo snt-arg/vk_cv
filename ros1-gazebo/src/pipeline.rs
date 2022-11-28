@@ -145,7 +145,7 @@ pub fn process_blocking(
             },
         };
 
-        // get the depth only if our object is bigger than 225px² (15x15)
+        // get the depth only if our object is bigger than 'min_area'
         if area_px > config.min_area {
             let pixel_coords = [
                 c[0] * color_frame.0.width as f32,
@@ -185,8 +185,6 @@ pub fn process_blocking(
                 let fy = *camera_proj.get((1, 1)).unwrap() as f32;
                 let cx = *camera_proj.get((0, 2)).unwrap() as f32;
                 let cy = *camera_proj.get((1, 2)).unwrap() as f32;
-
-                // println!("{}, cx {} cy {}, fx {}, fy {}", camera_proj, cx, cy, fx, fy);
 
                 // reproject
                 let z = depth;

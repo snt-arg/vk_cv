@@ -421,15 +421,16 @@ pub fn image_to_rgba8(info: &ImageInfo, data: &[u8]) -> (ImageInfo, Vec<u8>) {
         format: Format::R8G8B8A8_UINT,
     };
     let count = (info.width * info.height * 4) as usize;
-    let mut out = Vec::with_capacity(count);
+    let mut out = vec![255; count];
 
     match info.format {
         Format::R8G8B8_UINT => {
-            for cnk in data.chunks(3) {
-                out.push(cnk[0]);
-                out.push(cnk[1]);
-                out.push(cnk[2]);
-                out.push(255);
+            for (i, cnk) in data.chunks_exact(3).enumerate() {
+                unsafe {
+                    *out.get_unchecked_mut(i * 4 + 0) = *cnk.get_unchecked(0);
+                    *out.get_unchecked_mut(i * 4 + 1) = *cnk.get_unchecked(1);
+                    *out.get_unchecked_mut(i * 4 + 2) = *cnk.get_unchecked(2);
+                }
             }
 
             (new_info, out)
@@ -438,15 +439,16 @@ pub fn image_to_rgba8(info: &ImageInfo, data: &[u8]) -> (ImageInfo, Vec<u8>) {
         Format::R8G8B8A8_UNORM => (new_info, data.to_owned()),
         Format::R8_UINT | Format::R8_UNORM => {
             for i in 0..data.len() {
-                out.push(data[i]);
-                out.push(data[i]);
-                out.push(data[i]);
-                out.push(255);
+                unsafe {
+                    *out.get_unchecked_mut(i * 4 + 0) = *data.get_unchecked(i);
+                    *out.get_unchecked_mut(i * 4 + 1) = *data.get_unchecked(i);
+                    *out.get_unchecked_mut(i * 4 + 2) = *data.get_unchecked(i);
+                }
             }
 
             (new_info, out)
         }
-        Format::R16G16B16A16_SFLOAT => (new_info, vec![0; count]), // TODO
+        Format::R16G16B16A16_SFLOAT => (new_info, out), // TODO
         _ => panic!("unsuppored format {:?}", info.format),
     }
 }
