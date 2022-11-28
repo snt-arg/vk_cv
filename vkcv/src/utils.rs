@@ -393,27 +393,6 @@ pub fn basic_label(name: &str, image: &StorageImage) -> String {
     )
 }
 
-pub fn rgb8_to_rgba8(info: &ImageInfo, data: &[u8]) -> (ImageInfo, Vec<u8>) {
-    assert!(info.format == Format::R8G8B8_UINT);
-
-    let new_info = ImageInfo {
-        width: info.width,
-        height: info.height,
-        format: Format::R8G8B8A8_UINT,
-    };
-
-    // perform conversion
-    let mut out = Vec::with_capacity(data.len());
-    for i in 0..data.len() / 3 {
-        out.push(data[i * 3 + 0]);
-        out.push(data[i * 3 + 1]);
-        out.push(data[i * 3 + 2]);
-        out.push(255);
-    }
-
-    (new_info, out)
-}
-
 pub fn image_to_rgba8(info: &ImageInfo, data: &[u8]) -> (ImageInfo, Vec<u8>) {
     let new_info = ImageInfo {
         width: info.width,

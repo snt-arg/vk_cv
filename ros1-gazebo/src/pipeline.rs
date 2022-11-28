@@ -113,7 +113,7 @@ pub fn process_blocking(
     while rosrust::is_ok() {
         // grab depth and color image from the gazebo realsense
         let color_frame =
-            vkcv::utils::rgb8_to_rgba8(&img_info, &ros_color_image.blocking_recv().unwrap().data);
+            vkcv::utils::image_to_rgba8(&img_info, &ros_color_image.blocking_recv().unwrap().data);
         let depth_frame = ros_depth_image.blocking_recv().unwrap();
 
         // upload image to GPU
