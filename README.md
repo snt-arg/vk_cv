@@ -1,6 +1,6 @@
 # vk-cv
 
-A fast and lightweight Vulkan (GPU) accelerated computer vision pipeline for simple color tracking.
+A fast and lightweight Vulkan (GPU) accelerated computer vision pipeline for simple color detection.
 
 ## Pipeline
 
