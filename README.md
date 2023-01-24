@@ -94,4 +94,4 @@ Requires Vulkan 1.1 or higher.
 
 ## License
 
-TBD
+MIT
