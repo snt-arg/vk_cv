@@ -66,6 +66,11 @@ ARGS:
 
 ## Changes
 
+### Version 0.5
+
+* viewer UI
+* fixes
+
 ### Version 0.4
 
 * vulkano 0.30
