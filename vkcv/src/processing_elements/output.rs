@@ -46,7 +46,7 @@ impl ProcessingElement for Output {
                     storage_buffer: true,
                     ..Default::default()
                 },
-                false,
+                true,
                 (0..count).map(|_| 0u8),
             )
             .unwrap();
