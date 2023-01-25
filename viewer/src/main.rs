@@ -45,7 +45,7 @@ impl eframe::App for MyApp {
 
             let res = self.pipeline.fetch_and_process();
 
-            ui.heading("pipeline output");
+            ui.heading("Pipeline output");
             ui.label(format!(
                 "{}x{}x{}, {:?}",
                 res.image.info.width,
@@ -68,18 +68,18 @@ impl eframe::App for MyApp {
                 self.image.show(ui);
 
                 ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("MSV min");
+                    ui.heading("Filter Settings");
+                    egui::Grid::new("grid_hsv").striped(true).show(ui, |ui| {
+                        ui.label("HSV min");
                         if ui
                             .color_edit_button_hsva(&mut self.pipeline_cfg.hsv_min)
                             .changed()
                         {
                             recreate_pipeline = true;
                         }
-                    });
+                        ui.end_row();
 
-                    ui.horizontal(|ui| {
-                        ui.label("MSV max");
+                        ui.label("HSV max");
                         if ui
                             .color_edit_button_hsva(&mut self.pipeline_cfg.hsv_max)
                             .changed()
@@ -110,7 +110,8 @@ impl eframe::App for MyApp {
                         ui.vertical(|ui| {
                             let input_image = dl.transferred_image();
                             ui.label(format!(
-                                "{}x{}x{}, {:?}",
+                                "Stage {}: {}x{}x{}, {:?}",
+                                i + 1,
                                 input_image.info().width,
                                 input_image.info().height,
                                 input_image.info().bytes_per_pixel(),
