@@ -15,4 +15,4 @@ realsense-sys = {version="2.47.0", features=["buildtime-bindgen"]}
 bytemuck = { version = "1.12", features = ["derive", "extern_crate_std", "min_const_generics"] }
 
 [dev-dependencies]
-sysinfo = "0.26.7"
+sysinfo = "0.27.7"

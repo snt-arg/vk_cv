@@ -346,12 +346,17 @@ impl Realsense {
 impl Drop for Realsense {
     fn drop(&mut self) {
         unsafe {
-            rs2_pipeline_stop(self.pipe, ptr::null_mut());
-            rs2_delete_pipeline(self.pipe);
+            let mut err = ptr::null_mut();
+            rs2_pipeline_stop(self.pipe, &mut err);
+            panic_err(err);
+            rs2_delete_processing_block(self.hole_filter);
+            rs2_delete_frame_queue(self.frame_queue);
             rs2_delete_pipeline_profile(self.profile);
             rs2_delete_config(self.config);
+            rs2_delete_pipeline(self.pipe);
             rs2_delete_device(self.dev);
             rs2_delete_context(self.ctx);
+            println!("stopping realsense");
         }
     }
 }

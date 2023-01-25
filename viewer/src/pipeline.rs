@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use egui::color::Hsva;
+use eframe::epaint::Hsva;
 use vkcv::{
     draw::{draw_centroid, OwnedImage},
     endpoints::{image_download::ImageDownload, image_upload::ImageUpload},
